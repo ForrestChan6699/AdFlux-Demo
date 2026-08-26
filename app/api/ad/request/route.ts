@@ -23,8 +23,11 @@ async function seedInventoryIfEmpty() {
   await db.insert(campaigns).values({ id: "cmp_demo", advertiserId: "adv_demo", name: "全量演示计划", dailyBudget: 500_000 }).onConflictDoNothing();
 
   const rows = seedAds.map((ad) => ({ ...ad, campaignId: "cmp_demo" }));
-  for (let index = 0; index < rows.length; index += 20) {
-    await db.insert(adTable).values(rows.slice(index, index + 20)).onConflictDoNothing();
+  // D1 limits bound parameters per statement. Five rows keep each insert
+  // comfortably below that limit while still avoiding one request per ad.
+  const seedBatchSize = 5;
+  for (let index = 0; index < rows.length; index += seedBatchSize) {
+    await db.insert(adTable).values(rows.slice(index, index + seedBatchSize)).onConflictDoNothing();
   }
 }
 
