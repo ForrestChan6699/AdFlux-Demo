@@ -62,6 +62,9 @@ test("persists inventory and serves ad requests from the server", async () => {
   assert.match(route, /export async function POST/);
   assert.match(route, /runEngineWithAds/);
   assert.match(route, /impressionUrl/);
+  assert.match(route, /requestedAt\.toISOString\(\)/);
+  assert.match(route, /timeZone: "Asia\/Shanghai"/);
+  assert.match(route, /parseDatabaseUtc/);
   assert.match(migration, /CREATE TABLE `ad_requests`/);
   assert.match(migration, /CREATE TABLE `ads`/);
   assert.match(workbench, /fetch\("\/api\/ad\/request"/);

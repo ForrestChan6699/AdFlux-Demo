@@ -5,6 +5,21 @@ import { ads as seedAds, runEngineWithAds, type Ad, type RequestProfile, type St
 
 type AdRequestPayload = Partial<RequestProfile> & { placementId?: string; requestId?: string; strategy?: StrategyConfig };
 
+function parseDatabaseUtc(value: string): Date {
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalized);
+  return new Date(hasTimezone ? normalized : `${normalized}Z`);
+}
+
+function formatShanghaiTime(date: Date): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 function validatePayload(payload: AdRequestPayload): string | null {
   if (!payload.userId?.trim()) return "userId is required";
   if (!payload.placementId?.trim()) return "placementId is required";
@@ -54,6 +69,7 @@ export async function POST(request: Request) {
     const winner = result.billing;
     const origin = new URL(request.url).origin;
     const trackingToken = winner ? btoa(`${requestId}:${winner.id}`) : null;
+    const requestedAt = new Date();
 
     await getDb().insert(adRequests).values({
       id: requestId, userId: profile.userId, placementId: payload.placementId!.trim(),
@@ -61,10 +77,13 @@ export async function POST(request: Request) {
       recalledCount: result.recalled.length, filteredCount: result.filtered.length,
       winnerAdId: winner?.id, charge: winner?.charge,
       resultJson: { coarseCount: result.coarse.length, fineCount: result.fine.length, billingMode: winner?.billingMode },
+      createdAt: requestedAt.toISOString(),
     });
 
     return Response.json({
       requestId,
+      requestedAt: requestedAt.toISOString(),
+      requestedAtLocal: formatShanghaiTime(requestedAt),
       ad: winner ? {
         id: winner.id, brand: winner.brand, title: winner.title, category: winner.category,
         billingMode: winner.billingMode, bid: winner.bid, charge: winner.charge,
@@ -86,7 +105,16 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const requests = await getDb().select().from(adRequests).orderBy(desc(adRequests.createdAt)).limit(20);
+    const rows = await getDb().select().from(adRequests).orderBy(desc(adRequests.createdAt)).limit(20);
+    const requests = rows.map((row) => {
+      const createdAt = parseDatabaseUtc(row.createdAt);
+      return {
+        ...row,
+        createdAt: createdAt.toISOString(),
+        createdAtLocal: formatShanghaiTime(createdAt),
+        timezone: "Asia/Shanghai",
+      };
+    });
     return Response.json({ requests });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Unexpected error" }, { status: 500 });
