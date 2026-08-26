@@ -1,0 +1,58 @@
+export type RequestProfile = {
+  city: string;
+  device: string;
+  scene: string;
+  userId: string;
+};
+
+export type StrategyConfig = {
+  hotCtr: number;
+  frequencyCap: number;
+  coarseTopK: number;
+  fineTopK: number;
+  weights: {
+    ctr: number;
+    quality: number;
+    bid: number;
+    interest: number;
+  };
+};
+
+export type BillingMode = "CPM" | "CPC" | "CPA" | "oCPM";
+
+export type Ad = {
+  id: string;
+  brand: string;
+  title: string;
+  category: string;
+  regions: string[];
+  devices: string[];
+  scenes: string[];
+  billingMode: BillingMode;
+  bid: number;
+  ctr: number;
+  cvr: number;
+  quality: number;
+  budget: number;
+  frequency: number;
+  status: "active" | "paused";
+  color: string;
+};
+
+export type RankedAd = Ad & {
+  recall: string[];
+  coarseScore?: number;
+  fineScore?: number;
+  ecpm?: number;
+  charge?: number;
+  reason?: string;
+};
+
+export type EngineResult = {
+  recalled: RankedAd[];
+  rejected: RankedAd[];
+  filtered: RankedAd[];
+  coarse: RankedAd[];
+  fine: RankedAd[];
+  billing?: RankedAd;
+};

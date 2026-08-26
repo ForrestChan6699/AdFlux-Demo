@@ -21,16 +21,22 @@ test("server renders the ad decision workbench", async () => {
 });
 
 test("implements all five engine stages and billing safeguards", async () => {
-  const source = await readFile(new URL("../app/ad-engine.ts", import.meta.url), "utf8");
-  assert.match(source, /const recalled/);
-  assert.match(source, /const filtered/);
-  assert.match(source, /const coarse/);
-  assert.match(source, /const fine/);
-  assert.match(source, /const billing/);
-  assert.match(source, /频控上限/);
-  assert.match(source, /Math\.min\(winner\.bid/);
-  assert.match(source, /billingModes/);
-  assert.match(source, /ad\.billingMode===\"CPM\"/);
+  const [orchestrator, filter, rank, billing, data] = await Promise.all([
+    readFile(new URL("../app/engine/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/engine/filter.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/engine/rank.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/engine/billing.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/engine/data.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(orchestrator, /recallAds/);
+  assert.match(orchestrator, /filterAds/);
+  assert.match(orchestrator, /coarseRank/);
+  assert.match(orchestrator, /fineRank/);
+  assert.match(orchestrator, /calculateBilling/);
+  assert.match(filter, /频控上限/);
+  assert.match(billing, /Math\.min\(winner\.bid/);
+  assert.match(data, /billingModes/);
+  assert.match(rank, /ad\.billingMode === "CPM"/);
 });
 
 test("includes commercial operations, attribution, fraud and experiments", async () => {

@@ -1,4 +1,6 @@
-# vinext-starter
+# AdFlux 广告引擎 Demo
+
+代码结构、核心数据流和扩展说明请参阅 [docs/code-structure.md](docs/code-structure.md)。
 
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
