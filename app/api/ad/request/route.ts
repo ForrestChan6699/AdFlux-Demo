@@ -1,9 +1,9 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, desc } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { adRequests, ads as adTable, advertisers, campaigns } from "../../../../db/schema";
-import { ads as seedAds, runEngineWithAds, type Ad, type RequestProfile } from "../../../engine";
+import { ads as seedAds, runEngineWithAds, type Ad, type RequestProfile, type StrategyConfig } from "../../../engine";
 
-type AdRequestPayload = Partial<RequestProfile> & { placementId?: string; requestId?: string };
+type AdRequestPayload = Partial<RequestProfile> & { placementId?: string; requestId?: string; strategy?: StrategyConfig };
 
 function validatePayload(payload: AdRequestPayload): string | null {
   if (!payload.userId?.trim()) return "userId is required";
@@ -31,9 +31,9 @@ async function seedInventoryIfEmpty() {
   }
 }
 
-async function loadActiveAds(): Promise<Ad[]> {
+async function loadInventory(): Promise<Ad[]> {
   const db = getDb();
-  const rows = await db.select().from(adTable).where(eq(adTable.status, "active")).limit(1000);
+  const rows = await db.select().from(adTable).limit(1000);
   return rows.map(({ campaignId: _campaignId, createdAt: _createdAt, ...ad }) => ad);
 }
 
@@ -44,13 +44,13 @@ export async function POST(request: Request) {
     if (validationError) return Response.json({ error: validationError }, { status: 400 });
 
     await seedInventoryIfEmpty();
-    const inventory = await loadActiveAds();
+    const inventory = await loadInventory();
     const requestId = payload.requestId?.trim() || `req_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
     const profile: RequestProfile = {
       userId: payload.userId!.trim(), city: payload.city!.trim(),
       device: payload.device!, scene: payload.scene!,
     };
-    const result = runEngineWithAds(inventory, profile);
+    const result = runEngineWithAds(inventory, profile, payload.strategy);
     const winner = result.billing;
     const origin = new URL(request.url).origin;
     const trackingToken = winner ? btoa(`${requestId}:${winner.id}`) : null;

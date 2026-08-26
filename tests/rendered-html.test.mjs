@@ -50,10 +50,11 @@ test("includes commercial operations, attribution, fraud and experiments", async
 });
 
 test("persists inventory and serves ad requests from the server", async () => {
-  const [schema, route, migration] = await Promise.all([
+  const [schema, route, migration, workbench] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0000_tan_squirrel_girl.sql", import.meta.url), "utf8"),
+    readFile(new URL("../app/AdWorkbench.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(schema, /advertisers/);
   assert.match(schema, /campaigns/);
@@ -63,4 +64,6 @@ test("persists inventory and serves ad requests from the server", async () => {
   assert.match(route, /impressionUrl/);
   assert.match(migration, /CREATE TABLE `ad_requests`/);
   assert.match(migration, /CREATE TABLE `ads`/);
+  assert.match(workbench, /fetch\("\/api\/ad\/request"/);
+  assert.match(workbench, /data\.pipeline\.recalled/);
 });

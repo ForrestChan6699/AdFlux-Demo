@@ -1,1 +1,2 @@
 .billing-mode{display:inline-block;padding:5px 8px;border-radius:4px;font-weight:750;font-size:8px;letter-spacing:.05em}.mode-cpm{background:#e5efcf;color:#557128}.mode-cpc{background:#dce8f5;color:#3d6689}.mode-cpa{background:#f2dfcc;color:#8b582d}.mode-ocpm{background:#e8ddf3;color:#704d86}.table-wrap td strong small{font-size:8px;color:#8b938d;font-weight:400}
+.request-card.request-error{border-color:#d98b80;background:#fff7f5}.request-card.request-error small{color:#a63f32}
