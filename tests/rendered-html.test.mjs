@@ -29,6 +29,8 @@ test("implements all five engine stages and billing safeguards", async () => {
   assert.match(source, /const billing/);
   assert.match(source, /频控上限/);
   assert.match(source, /Math\.min\(winner\.bid/);
+  assert.match(source, /billingModes/);
+  assert.match(source, /ad\.billingMode===\"CPM\"/);
 });
 
 test("includes commercial operations, attribution, fraud and experiments", async () => {
