@@ -30,3 +30,13 @@ test("implements all five engine stages and billing safeguards", async () => {
   assert.match(source, /频控上限/);
   assert.match(source, /Math\.min\(winner\.bid/);
 });
+
+test("includes commercial operations, attribution, fraud and experiments", async () => {
+  const source = await readFile(new URL("../app/PlatformModules.tsx", import.meta.url), "utf8");
+  assert.match(source, /BUDGET PACING/);
+  assert.match(source, /oCPM/);
+  assert.match(source, /事件模拟器/);
+  assert.match(source, /归因模型对比/);
+  assert.match(source, /设备指纹聚类/);
+  assert.match(source, /A\/B 实验/);
+});
