@@ -41,7 +41,9 @@ engine/
 │   └── chatgpt-auth.ts       # 可选的 ChatGPT 登录辅助函数
 ├── db/
 │   ├── index.ts              # Drizzle 数据库入口
-│   └── schema.ts             # D1 数据库 Schema 预留
+│   └── schema.ts             # 广告主、计划、广告和请求日志表
+├── app/api/ad/request/
+│   └── route.ts              # 服务端广告请求与历史查询接口
 ├── worker/
 │   └── index.ts              # Cloudflare Worker 运行入口
 ├── tests/
@@ -183,7 +185,24 @@ npm run build
 
 ## 9. 后续扩展建议
 
-当前数据和操作均为前端内存状态。若要继续向真实系统靠近，建议按以下边界拆分：
+广告库存与请求日志已经接入 D1；其他运营页面的交互状态仍保存在前端。若要继续向真实系统靠近，建议按以下边界拆分：
+
+### 服务端广告请求
+
+```http
+POST /api/ad/request
+Content-Type: application/json
+
+{
+  "userId": "u_90382",
+  "placementId": "feed_home",
+  "city": "上海",
+  "device": "iOS",
+  "scene": "信息流"
+}
+```
+
+接口首次运行时会向空数据库写入 240 条演示广告，随后从 D1 加载活跃库存，在服务端执行完整决策链路，并保存请求、候选数量、胜出广告和计费结果。`GET /api/ad/request` 返回最近 20 条请求。
 
 1. 将 `ad-engine.ts` 拆为 `recall`、`filter`、`rank`、`auction` 四个领域模块。
 2. 使用 D1 保存广告主、Campaign、创意、预算、事件及实验配置。

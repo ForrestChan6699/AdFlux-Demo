@@ -48,3 +48,19 @@ test("includes commercial operations, attribution, fraud and experiments", async
   assert.match(source, /设备指纹聚类/);
   assert.match(source, /A\/B 实验/);
 });
+
+test("persists inventory and serves ad requests from the server", async () => {
+  const [schema, route, migration] = await Promise.all([
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0000_tan_squirrel_girl.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(schema, /advertisers/);
+  assert.match(schema, /campaigns/);
+  assert.match(schema, /adRequests/);
+  assert.match(route, /export async function POST/);
+  assert.match(route, /runEngineWithAds/);
+  assert.match(route, /impressionUrl/);
+  assert.match(migration, /CREATE TABLE `ad_requests`/);
+  assert.match(migration, /CREATE TABLE `ads`/);
+});

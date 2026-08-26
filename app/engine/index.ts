@@ -10,7 +10,15 @@ export function runEngine(
   request: RequestProfile,
   strategy: StrategyConfig = defaultStrategy,
 ): EngineResult {
-  const recalled = recallAds(ads, request, strategy);
+  return runEngineWithAds(ads, request, strategy);
+}
+
+export function runEngineWithAds(
+  inventory: import("./types").Ad[],
+  request: RequestProfile,
+  strategy: StrategyConfig = defaultStrategy,
+): EngineResult {
+  const recalled = recallAds(inventory, request, strategy);
   const { rejected, filtered } = filterAds(recalled, request, strategy);
   const coarse = coarseRank(filtered, strategy);
   const fine = fineRank(coarse, strategy);
