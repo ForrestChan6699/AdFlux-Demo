@@ -142,6 +142,11 @@ export async function POST(request: Request) {
       } : null,
       budget: reservation ? { reservationId: reservation.id, amount: reservation.amount, status: reservation.status, expiresAt: reservation.expires_at } : null,
       pipeline: { inventory: inventory.length, recalled: result.recalled.length, filtered: result.filtered.length, coarse: result.coarse.length, fine: result.fine.length },
+      candidates: {
+        recalled: result.recalled, rejected: result.rejected,
+        filtered: result.filtered, coarse: result.coarse, fine: result.fine,
+        billing: auction?.winner,
+      },
       tracking: auction ? {
         impressionUrl: `${origin}/api/events/impression?token=${trackingToken}`,
         clickUrl: `${origin}/api/events/click?token=${trackingToken}`,
