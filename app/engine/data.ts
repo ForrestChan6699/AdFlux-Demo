@@ -33,9 +33,9 @@ function createAd(index: number): Ad {
     quality: Number((0.72 + ((index * 11) % 27) / 100).toFixed(2)),
     budget: index % 31 === 0 ? 0 : 1800 + ((index * 379) % 22000),
     frequency: index % 9,
-    status: index % 37 === 0 ? "paused" : "active",
+    status: "active",
     color: colors[index % colors.length],
   };
 }
 
-export const ads: Ad[] = Array.from({ length: 240 }, (_, index) => createAd(index));
+export const ads: Ad[] = Array.from({ length: 50 }, (_, index) => createAd(index));

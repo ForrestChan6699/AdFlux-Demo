@@ -38,6 +38,7 @@ test("implements all five engine stages and billing safeguards", async () => {
   assert.match(auction, /runnerUpEcpm/);
   assert.match(auction, /floorEcpm/);
   assert.match(data, /billingModes/);
+  assert.match(data, /length: 50/);
   assert.match(rank, /ad\.billingMode === "CPM"/);
 });
 

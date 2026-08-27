@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { desc, eq, like } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, placements } from "../../../../db/schema";
 import { ads as seedAds, runAuction, runEngineWithAds, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
@@ -29,25 +29,26 @@ function validatePayload(payload: AdRequestPayload): string | null {
   return null;
 }
 
-async function seedInventoryIfEmpty() {
+async function ensureCanonicalInventory() {
   const db = getDb();
   await db.insert(placements).values([
     { id: "feed_home", name: "首页信息流", auctionType: "gsp", floorEcpm: 8 },
     { id: "video_recommend", name: "推荐视频流", auctionType: "first_price", floorEcpm: 12 },
   ]).onConflictDoNothing();
 
-  const [inventory] = await db.select({ value: count() }).from(adTable);
-  if (inventory.value > 0) return;
   await db.insert(advertisers).values({ id: "adv_demo", name: "AdFlux 演示广告主", balance: 1_000_000 }).onConflictDoNothing();
   await db.insert(campaigns).values({ id: "cmp_demo", advertiserId: "adv_demo", name: "全量演示计划", dailyBudget: 500_000 }).onConflictDoNothing();
   const rows = seedAds.map((ad) => ({ ...ad, campaignId: "cmp_demo" }));
   for (let index = 0; index < rows.length; index += 5) {
     await db.insert(adTable).values(rows.slice(index, index + 5)).onConflictDoNothing();
   }
+  await db.update(adTable).set({ status: "active" }).where(eq(adTable.campaignId, "cmp_demo"));
+  await db.update(adTable).set({ status: "paused" }).where(like(adTable.id, "local_ad_%"));
 }
 
 async function loadInventory(): Promise<Ad[]> {
-  const rows = await getDb().select().from(adTable).limit(1000);
+  const rows = await getDb().select().from(adTable)
+    .where(eq(adTable.campaignId, "cmp_demo")).limit(50);
   return rows.map(({ campaignId: _campaignId, createdAt: _createdAt, ...ad }) => ad);
 }
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     const validationError = validatePayload(payload);
     if (validationError) return Response.json({ error: validationError }, { status: 400 });
 
-    await seedInventoryIfEmpty();
+    await ensureCanonicalInventory();
     await releaseExpiredReservations();
     const db = getDb();
     const [placement] = await db.select().from(placements)
