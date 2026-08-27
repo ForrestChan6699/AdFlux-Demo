@@ -47,7 +47,7 @@ async function ensureCanonicalInventory() {
 
 async function loadInventory(): Promise<Ad[]> {
   const rows = await getDb().select().from(adTable)
-    .where(eq(adTable.campaignId, "cmp_demo")).limit(50);
+    .where(eq(adTable.campaignId, "cmp_demo")).limit(100);
   return rows.map(({ campaignId: _campaignId, createdAt: _createdAt, ...ad }) => ad);
 }
 
