@@ -36,5 +36,6 @@ yarn-error.log*
 
 /dist/
 /.wrangler/
+/adflux-local.sqlite
 /outputs/
 /work/

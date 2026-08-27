@@ -15,6 +15,13 @@
       "when": 1787728080279,
       "tag": "0001_dear_spitfire",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787731369980,
+      "tag": "0002_flawless_rage",
+      "breakpoints": true
     }
   ]
 }

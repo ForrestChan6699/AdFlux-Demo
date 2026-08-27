@@ -19,6 +19,8 @@ export type StrategyConfig = {
 };
 
 export type BillingMode = "CPM" | "CPC" | "CPA" | "oCPM";
+export type AuctionType = "first_price" | "gsp";
+export type ChargeEvent = "impression" | "click" | "conversion";
 
 export type Ad = {
   id: string;
@@ -55,4 +57,13 @@ export type EngineResult = {
   coarse: RankedAd[];
   fine: RankedAd[];
   billing?: RankedAd;
+};
+
+export type AuctionResult = {
+  winner: RankedAd;
+  auctionType: AuctionType;
+  clearingEcpm: number;
+  unitPrice: number;
+  eventCharge: number;
+  chargeEvent: ChargeEvent;
 };

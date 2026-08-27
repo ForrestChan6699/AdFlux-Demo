@@ -14,6 +14,9 @@ AdFlux 是一个基于 React 19、TypeScript、vinext 和 Cloudflare Worker 构�
 - 多模型转化归因
 - 反作弊规则和风险事件
 - A/B 实验及数据监控
+- 一价/GSP 竞价、动态底价与统一 eCPM 清算
+- 预算预占、事件扣费、超时释放与资金账本
+- 曝光、点击、转化事件幂等采集
 
 ## 2. 目录结构
 
@@ -33,7 +36,8 @@ engine/
 │   │   ├── recall.ts         # 多路召回
 │   │   ├── filter.ts         # 定向、预算和频控过滤
 │   │   ├── rank.ts           # 粗排、精排及 eCPM 换算
-│   │   └── billing.ts        # 多计费模式清算
+│   │   ├── billing.ts        # 多计费模式兼容入口
+│   │   └── auction.ts        # 一价/GSP、底价和计费事件
 │   ├── globals.css           # 全局基础样式
 │   ├── workbench.css         # 决策台、策略页和监控页样式
 │   ├── modules.css           # 商业化扩展模块样式
@@ -44,6 +48,12 @@ engine/
 │   └── schema.ts             # 广告主、计划、广告和请求日志表
 ├── app/api/ad/request/
 │   └── route.ts              # 服务端广告请求与历史查询接口
+├── app/api/events/[type]/
+│   └── route.ts              # 曝光、点击、转化采集与幂等扣费
+├── app/api/billing/ledger/
+│   └── route.ts              # 预算预占及资金账本查询
+├── app/server/
+│   └── budget.ts             # 预算原子预占、确认和超时释放
 ├── worker/
 │   └── index.ts              # Cloudflare Worker 运行入口
 ├── tests/
@@ -204,11 +214,23 @@ Content-Type: application/json
 
 接口首次运行时会向空数据库写入 240 条演示广告，随后从 D1 加载活跃库存，在服务端执行完整决策链路，并保存请求、候选数量、胜出广告和计费结果。`GET /api/ad/request` 返回最近 20 条请求。
 
-1. 将 `ad-engine.ts` 拆为 `recall`、`filter`、`rank`、`auction` 四个领域模块。
-2. 使用 D1 保存广告主、Campaign、创意、预算、事件及实验配置。
-3. 增加事件 API，进行曝光、点击、转化去重和归因窗口计算。
-4. 将预算消耗及频控改为原子计数，避免并发请求超投。
-5. 为每个策略版本保存配置快照，支持灰度、回滚和审计。
-6. 将固定监控数据替换为事件聚合指标和告警规则。
+### 预算、事件与竞价闭环
+
+广告请求按广告位配置执行一价或 GSP 竞价。所有计费模式先换算为 eCPM 并应用底价；胜出候选必须成功预占广告主余额和 Campaign 日预算，否则自动尝试下一候选。
+
+```text
+胜出 → reserved / reserve 账本
+计费事件到达 → charged / charge 账本
+15 分钟超时 → released / 返还余额和预算
+```
+
+`feed_home` 使用 GSP，`video_recommend` 使用一价。CPM 和 oCPM 在有效曝光时确认，CPC 在点击时确认，CPA 在转化时确认。
+
+事件接口为 `GET/POST /api/events/{impression|click|conversion}?token=...`。事件支持 `Idempotency-Key`；未提供时按“请求 ID + 事件类型”去重，重复上报不会重复扣费。`GET /api/billing/ledger` 可检查预占、状态和资金流水。
+
+1. 增加退款、人工调账审批和日终对账任务。
+2. 对事件加入可见性验证、签名、风险评分和归因窗口计算。
+3. 为每个策略版本保存配置快照，支持灰度、回滚和审计。
+4. 将固定监控数据替换为事件聚合指标和告警规则。
 
 为了保持现有页面稳定，新增领域逻辑应优先放到独立模块中，再由 `AdWorkbench` 负责组合，避免把算法、数据和展示继续集中在单一组件。

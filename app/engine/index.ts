@@ -30,7 +30,8 @@ export function runEngineWithAds(
 export { ads } from "./data";
 export { defaultStrategy, interests } from "./config";
 export { calculateBilling } from "./billing";
+export { runAuction } from "./auction";
 export { calculateEcpm, coarseRank, fineRank } from "./rank";
 export { filterAds } from "./filter";
 export { recallAds } from "./recall";
-export type { Ad, BillingMode, EngineResult, RankedAd, RequestProfile, StrategyConfig } from "./types";
+export type { Ad, AuctionResult, AuctionType, BillingMode, ChargeEvent, EngineResult, RankedAd, RequestProfile, StrategyConfig } from "./types";

@@ -21,11 +21,11 @@ test("server renders the ad decision workbench", async () => {
 });
 
 test("implements all five engine stages and billing safeguards", async () => {
-  const [orchestrator, filter, rank, billing, data] = await Promise.all([
+  const [orchestrator, filter, rank, auction, data] = await Promise.all([
     readFile(new URL("../app/engine/index.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/engine/filter.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/engine/rank.ts", import.meta.url), "utf8"),
-    readFile(new URL("../app/engine/billing.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/engine/auction.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/engine/data.ts", import.meta.url), "utf8"),
   ]);
   assert.match(orchestrator, /recallAds/);
@@ -34,9 +34,31 @@ test("implements all five engine stages and billing safeguards", async () => {
   assert.match(orchestrator, /fineRank/);
   assert.match(orchestrator, /calculateBilling/);
   assert.match(filter, /频控上限/);
-  assert.match(billing, /Math\.min\(winner\.bid/);
+  assert.match(auction, /first_price/);
+  assert.match(auction, /runnerUpEcpm/);
+  assert.match(auction, /floorEcpm/);
   assert.match(data, /billingModes/);
   assert.match(rank, /ad\.billingMode === "CPM"/);
+});
+
+test("implements budget safety, event idempotency and immutable ledger", async () => {
+  const [budget, events, route, migration] = await Promise.all([
+    readFile(new URL("../app/server/budget.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/events/[type]/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0002_flawless_rage.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(budget, /reserveBudget/);
+  assert.match(budget, /releaseExpiredReservations/);
+  assert.match(budget, /settleReservation/);
+  assert.match(budget, /c\.spent \+ \? <= c\.daily_budget/);
+  assert.match(events, /idempotency-key/);
+  assert.match(events, /onConflictDoNothing/);
+  assert.match(route, /runAuction/);
+  assert.match(route, /candidateReservation/);
+  assert.match(migration, /CREATE TABLE `budget_reservations`/);
+  assert.match(migration, /CREATE TABLE `billing_ledger`/);
+  assert.match(migration, /CREATE TABLE `ad_events`/);
 });
 
 test("includes commercial operations, attribution, fraud and experiments", async () => {
