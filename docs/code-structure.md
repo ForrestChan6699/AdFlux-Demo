@@ -226,7 +226,11 @@ Content-Type: application/json
 
 `feed_home` 使用 GSP，`video_recommend` 使用一价。CPM 和 oCPM 在有效曝光时确认，CPC 在点击时确认，CPA 在转化时确认。
 
-事件接口为 `GET/POST /api/events/{impression|click|conversion}?token=...`。事件支持 `Idempotency-Key`；未提供时按“请求 ID + 事件类型”去重，重复上报不会重复扣费。`GET /api/billing/ledger` 可检查预占、状态和资金流水。
+事件写入接口为 `GET/POST /api/events/{impression|click|conversion}?token=...`，查询接口为 `GET /api/events`，并可用 `requestId` 过滤。写入接口校验 tracking token、胜出广告、请求后 7 天归因窗口以及“曝光 → 点击 → 转化”的顺序。`Idempotency-Key` 在请求和事件类型内隔离，重复上报不会重复记录或扣费。
+
+每次成功拍卖都会写入 `auction_logs`，保存竞价类型、胜出者、第二名、底价、清算 eCPM、计费事件和候选数量。`GET /api/billing/ledger` 同时返回账户、预算预占、资金流水和拍卖审计。
+
+数据库迁移为 `billing_ledger`、`auction_logs` 和 `ad_events` 建立禁止 `UPDATE/DELETE` 的触发器。资金或审计修正只能追加退款/调账记录，不能覆盖历史；预算预占也只能从 `reserved` 单向进入 `charged` 或 `released`。
 
 1. 增加退款、人工调账审批和日终对账任务。
 2. 对事件加入可见性验证、签名、风险评分和归因窗口计算。

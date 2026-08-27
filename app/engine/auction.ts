@@ -32,6 +32,9 @@ export function runAuction(
 
   return {
     winner: { ...winner, charge: Number(unitPrice.toFixed(4)) },
+    runnerUp: eligible[1],
+    winnerEcpm: Number(winnerEcpm.toFixed(4)),
+    runnerUpEcpm: Number(runnerUpEcpm.toFixed(4)),
     auctionType,
     clearingEcpm: Number(clearingEcpm.toFixed(4)),
     unitPrice: Number(unitPrice.toFixed(4)),

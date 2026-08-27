@@ -22,6 +22,13 @@
       "when": 1787731369980,
       "tag": "0002_flawless_rage",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787823454335,
+      "tag": "0003_groovy_sentinels",
+      "breakpoints": true
     }
   ]
 }

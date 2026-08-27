@@ -61,6 +61,9 @@ export type EngineResult = {
 
 export type AuctionResult = {
   winner: RankedAd;
+  runnerUp?: RankedAd;
+  winnerEcpm: number;
+  runnerUpEcpm: number;
   auctionType: AuctionType;
   clearingEcpm: number;
   unitPrice: number;

@@ -1,6 +1,6 @@
 import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { adRequests, ads as adTable, advertisers, campaigns, placements } from "../../../../db/schema";
+import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, placements } from "../../../../db/schema";
 import { ads as seedAds, runAuction, runEngineWithAds, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
 import { releaseExpiredReservations, reserveBudget } from "../../../server/budget";
 
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
 
     let auction;
     let reservation;
+    let auctionCandidateCount = 0;
     for (let offset = 0; offset < result.fine.length; offset += 1) {
       const candidateAuction = runAuction(
         result.fine.slice(offset), placement.auctionType as AuctionType, placement.floorEcpm,
@@ -98,11 +99,21 @@ export async function POST(request: Request) {
       if (candidateReservation) {
         auction = candidateAuction;
         reservation = candidateReservation;
+        auctionCandidateCount = result.fine.length - offset;
         break;
       }
     }
 
     if (auction) {
+      await db.insert(auctionLogs).values({
+        id: `auc_${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`,
+        requestId, placementId: placement.id, auctionType: auction.auctionType,
+        winnerAdId: auction.winner.id, runnerUpAdId: auction.runnerUp?.id,
+        winnerEcpm: auction.winnerEcpm, runnerUpEcpm: auction.runnerUpEcpm,
+        floorEcpm: placement.floorEcpm, clearingEcpm: auction.clearingEcpm,
+        chargeEvent: auction.chargeEvent, eventCharge: auction.eventCharge,
+        candidateCount: auctionCandidateCount, createdAt: requestedAt.toISOString(),
+      });
       await db.update(adRequests).set({
         winnerAdId: auction.winner.id, charge: auction.unitPrice,
         auctionType: auction.auctionType, clearingEcpm: auction.clearingEcpm,
@@ -124,7 +135,11 @@ export async function POST(request: Request) {
         clearingEcpm: auction.clearingEcpm, predictedCtr: auction.winner.ctr,
         predictedCvr: auction.winner.cvr, ecpm: auction.winner.ecpm,
       } : null,
-      auction: auction ? { type: auction.auctionType, floorEcpm: placement.floorEcpm, clearingEcpm: auction.clearingEcpm } : null,
+      auction: auction ? {
+        type: auction.auctionType, floorEcpm: placement.floorEcpm,
+        winnerEcpm: auction.winnerEcpm, runnerUpEcpm: auction.runnerUpEcpm,
+        clearingEcpm: auction.clearingEcpm, candidateCount: auctionCandidateCount,
+      } : null,
       budget: reservation ? { reservationId: reservation.id, amount: reservation.amount, status: reservation.status, expiresAt: reservation.expires_at } : null,
       pipeline: { inventory: inventory.length, recalled: result.recalled.length, filtered: result.filtered.length, coarse: result.coarse.length, fine: result.fine.length },
       tracking: auction ? {

@@ -42,11 +42,12 @@ test("implements all five engine stages and billing safeguards", async () => {
 });
 
 test("implements budget safety, event idempotency and immutable ledger", async () => {
-  const [budget, events, route, migration] = await Promise.all([
+  const [budget, events, route, migration, hardeningMigration] = await Promise.all([
     readFile(new URL("../app/server/budget.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/events/[type]/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0002_flawless_rage.sql", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0003_groovy_sentinels.sql", import.meta.url), "utf8"),
   ]);
   assert.match(budget, /reserveBudget/);
   assert.match(budget, /releaseExpiredReservations/);
@@ -54,11 +55,18 @@ test("implements budget safety, event idempotency and immutable ledger", async (
   assert.match(budget, /c\.spent \+ \? <= c\.daily_budget/);
   assert.match(events, /idempotency-key/);
   assert.match(events, /onConflictDoNothing/);
+  assert.match(events, /event is required before/);
+  assert.match(events, /7 \* 86_400_000/);
   assert.match(route, /runAuction/);
   assert.match(route, /candidateReservation/);
+  assert.match(route, /auctionLogs/);
   assert.match(migration, /CREATE TABLE `budget_reservations`/);
   assert.match(migration, /CREATE TABLE `billing_ledger`/);
   assert.match(migration, /CREATE TABLE `ad_events`/);
+  assert.match(hardeningMigration, /billing_ledger_no_update/);
+  assert.match(hardeningMigration, /billing ledger is append-only/);
+  assert.match(hardeningMigration, /auction_logs_no_delete/);
+  assert.match(hardeningMigration, /budget_reservations_guard_update/);
 });
 
 test("includes commercial operations, attribution, fraud and experiments", async () => {

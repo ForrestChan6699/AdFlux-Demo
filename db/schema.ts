@@ -90,6 +90,26 @@ export const billingLedger = sqliteTable("billing_ledger", {
   index("idx_billing_ledger_reservation").on(table.reservationId),
 ]);
 
+export const auctionLogs = sqliteTable("auction_logs", {
+  id: text("id").primaryKey(),
+  requestId: text("request_id").notNull().references(() => adRequests.id),
+  placementId: text("placement_id").notNull().references(() => placements.id),
+  auctionType: text("auction_type", { enum: ["first_price", "gsp"] }).notNull(),
+  winnerAdId: text("winner_ad_id").notNull().references(() => ads.id),
+  runnerUpAdId: text("runner_up_ad_id").references(() => ads.id),
+  winnerEcpm: real("winner_ecpm").notNull(),
+  runnerUpEcpm: real("runner_up_ecpm").notNull(),
+  floorEcpm: real("floor_ecpm").notNull(),
+  clearingEcpm: real("clearing_ecpm").notNull(),
+  chargeEvent: text("charge_event", { enum: ["impression", "click", "conversion"] }).notNull(),
+  eventCharge: real("event_charge").notNull(),
+  candidateCount: integer("candidate_count").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("idx_auction_logs_request").on(table.requestId),
+  index("idx_auction_logs_created_at").on(table.createdAt),
+]);
+
 export const adEvents = sqliteTable("ad_events", {
   id: text("id").primaryKey(),
   requestId: text("request_id").notNull().references(() => adRequests.id),

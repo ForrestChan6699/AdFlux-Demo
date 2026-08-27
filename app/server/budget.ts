@@ -63,7 +63,7 @@ export async function settleReservation(requestId: string, event: ChargeEvent): 
 
   const settledAt = new Date().toISOString();
   const ledgerId = `led_${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`;
-  await d1.batch([
+  const results = await d1.batch([
     d1.prepare(`UPDATE budget_reservations SET status = 'charged', settled_at = ?
       WHERE id = ? AND status = 'reserved'`).bind(settledAt, reservation.id),
     d1.prepare(`INSERT OR IGNORE INTO billing_ledger
@@ -72,7 +72,7 @@ export async function settleReservation(requestId: string, event: ChargeEvent): 
       FROM budget_reservations WHERE id = ? AND status = 'charged' AND settled_at = ?`)
       .bind(ledgerId, `charge:${reservation.id}`, settledAt, reservation.id, settledAt),
   ]);
-  return true;
+  return Number(results[0]?.meta?.changes ?? 0) > 0;
 }
 
 export async function releaseExpiredReservations(): Promise<number> {
@@ -81,10 +81,11 @@ export async function releaseExpiredReservations(): Promise<number> {
   const expired = await d1.prepare(`SELECT * FROM budget_reservations
     WHERE status = 'reserved' AND expires_at <= ? LIMIT 50`).bind(now).all<Reservation>();
 
+  let released = 0;
   for (const item of expired.results) {
     const marker = new Date().toISOString();
     const ledgerId = `led_${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`;
-    await d1.batch([
+    const results = await d1.batch([
       d1.prepare(`UPDATE budget_reservations SET status = 'released', settled_at = ?
         WHERE id = ? AND status = 'reserved'`).bind(marker, item.id),
       d1.prepare(`UPDATE campaigns SET spent = MAX(0, spent - ?) WHERE id = ? AND EXISTS
@@ -99,6 +100,7 @@ export async function releaseExpiredReservations(): Promise<number> {
         FROM budget_reservations WHERE id = ? AND status = 'released' AND settled_at = ?`)
         .bind(ledgerId, `release:${item.id}`, marker, item.id, marker),
     ]);
+    if (Number(results[0]?.meta?.changes ?? 0) > 0) released += 1;
   }
-  return expired.results.length;
+  return released;
 }
