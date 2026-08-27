@@ -38,4 +38,4 @@ function createAd(index: number): Ad {
   };
 }
 
-export const ads: Ad[] = Array.from({ length: 100 }, (_, index) => createAd(index));
+export const ads: Ad[] = Array.from({ length: 200 }, (_, index) => createAd(index));
