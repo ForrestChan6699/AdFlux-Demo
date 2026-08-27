@@ -20,3 +20,99 @@
 }
 
 body { margin: 0; background: #f4f4ef; color: #17211c; font-family: Arial, Helvetica, sans-serif; }
+
+/* Readability pass: the dashboard previously used 7–10px UI text extensively. */
+body { font-size: 16px; }
+
+.brand-copy strong { font-size: 20px !important; }
+.brand-copy span,
+.topbar nav button,
+.status,
+.hero p,
+.request-card strong { font-size: 15px !important; }
+
+.eyebrow,
+.section-label,
+.request-card span,
+.request-card small,
+.live-badge,
+.stage-head span,
+.stage > small,
+.stage p,
+.stage-foot,
+.workspace label,
+.interest > span,
+.interest mark,
+.latency,
+.stage-detail > p,
+.summary-strip span,
+.table-wrap table,
+.table-wrap th,
+.rank,
+.more,
+.winner-label,
+.winner-brand p,
+.winner-stats span,
+.winner-stats b,
+.charge > strong small,
+.formula span,
+.formula b,
+.charge > p,
+.range > span,
+.range small,
+.impact-row,
+.impact button,
+.kpis article span,
+.kpis article small,
+.panel-head small,
+.funnel-row,
+.bars b,
+.bars span,
+.request-row,
+footer,
+.legend,
+.kv,
+.account-card > button,
+.recommendation button,
+.billing-modes span,
+.mode,
+.campaign-table table,
+.results table,
+.creative-preview p,
+.creative-preview code,
+.event-actions button,
+.event-log p,
+.journey-step b,
+.journey-step small,
+.attr-row,
+.rule b,
+.rule small,
+.risk-donut span,
+.risk-legend span,
+.alert-row,
+.experiment-head p,
+.variant,
+.significant,
+.recommendation p,
+.billing-mode,
+.table-wrap td strong small { font-size: 13px !important; }
+
+.stage-head b { font-size: 16px !important; }
+.workspace input,
+.workspace select { font-size: 14px !important; padding: 11px 12px !important; }
+.workspace h2,
+.config-card h2,
+.panel h2 { font-size: 27px !important; }
+.table-wrap th,
+.table-wrap td,
+.campaign-table th,
+.campaign-table td,
+.results th,
+.results td { padding: 13px 14px !important; }
+.run-button,
+.experiment-stop,
+.experiment-start { font-size: 14px; }
+
+@media (max-width: 850px) {
+  .topbar nav button { font-size: 13px !important; }
+}
