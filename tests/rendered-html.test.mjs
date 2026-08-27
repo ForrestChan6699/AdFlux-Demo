@@ -80,6 +80,20 @@ test("includes commercial operations, attribution, fraud and experiments", async
   assert.match(source, /A\/B 实验/);
 });
 
+test("includes a repeatable recall quality test bench", async () => {
+  const [bench, workbench] = await Promise.all([
+    readFile(new URL("../app/RecallTestBench.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/AdWorkbench.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(bench, /const scenarios/);
+  assert.match(bench, /合并无重复/);
+  assert.match(bench, /空召回率/);
+  assert.match(bench, /运行全部场景/);
+  assert.match(bench, /channels\.targeting/);
+  assert.match(workbench, /recalltest/);
+  assert.match(workbench, /召回测试/);
+});
+
 test("persists inventory and serves ad requests from the server", async () => {
   const [schema, route, migration, workbench] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),

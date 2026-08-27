@@ -141,3 +141,12 @@ footer,
   font-size: 12px;
   cursor: pointer;
 }
+
+.recall-bench { display: grid; gap: 12px; }
+.recall-summary { overflow: hidden; }
+.recall-channel-bars { display: grid; gap: 13px; margin-top: 12px; }
+.recall-channel-bars > div { display: grid; grid-template-columns: 100px 1fr 55px; align-items: center; gap: 12px; font-size: 13px; }
+.recall-channel-bars i { height: 9px; min-width: 3px; border-radius: 5px; background: #789d36; }
+.recall-channel-bars b { text-align: right; }
+.recall-bench .campaign-table table { min-width: 980px; }
+.recall-bench .campaign-table td small { line-height: 1.5; }

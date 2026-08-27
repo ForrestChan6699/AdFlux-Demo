@@ -17,6 +17,7 @@ AdFlux 是一个基于 React 19、TypeScript、vinext 和 Cloudflare Worker 构�
 - 一价/GSP 竞价、动态底价与统一 eCPM 清算
 - 预算预占、事件扣费、超时释放与资金账本
 - 曝光、点击、转化事件幂等采集
+- 召回黄金场景回归、通道覆盖与空召回监控
 
 ## 2. 目录结构
 
@@ -26,13 +27,14 @@ engine/
 │   ├── page.tsx              # 根页面，挂载广告平台控制台
 │   ├── layout.tsx            # HTML 根布局、字体和页面元数据
 │   ├── AdWorkbench.tsx       # 在线决策、策略配置、监控和顶层导航
+│   ├── RecallTestBench.tsx   # 召回黄金场景、质量断言与通道统计
 │   ├── PlatformModules.tsx   # 投放、归因、风控和实验模块
 │   ├── ad-engine.ts          # 广告引擎兼容导出入口
 │   ├── engine/
 │   │   ├── index.ts          # 五阶段统一编排和公共导出
 │   │   ├── types.ts          # 请求、策略、广告及结果类型
 │   │   ├── config.ts         # 默认策略和兴趣配置
-│   │   ├── data.ts           # 240 条演示广告生成
+│   │   ├── data.ts           # 200 条标准演示广告生成
 │   │   ├── recall.ts         # 多路召回
 │   │   ├── filter.ts         # 定向、预算和频控过滤
 │   │   ├── rank.ts           # 粗排、精排及 eCPM 换算
@@ -79,6 +81,7 @@ page.tsx
     │   └── Billing             胜出广告和计费结果
     ├── Strategy                策略配置
     ├── Monitor                 数据监控
+    ├── RecallTestBench         召回测试台
     ├── CampaignManager         广告主、计划、Pacing
     ├── EventAttribution        事件模拟和转化归因
     ├── RiskCenter              反作弊与风险告警
@@ -137,7 +140,7 @@ oCPM eCPM = 目标转化出价 × pCTR × pCVR × 1000
 
 ## 5. 前端状态与交互
 
-项目目前是无后端持久化的交互 Demo，状态保存在 React 组件中：
+在线请求、广告库存、事件与计费流水已由服务端接口和 D1 持久化；策略页和部分运营演示状态仍保存在 React 组件中：
 
 - `request`：请求画像。
 - `strategy`：当前策略参数。
@@ -171,6 +174,12 @@ oCPM eCPM = 目标转化出价 × pCTR × pCVR × 1000
 ### 数据监控
 
 `Monitor` 展示 QPS、填充率、平均 eCPM、P99 延迟、实时漏斗、阶段耗时及近期请求流。
+
+### 召回测试台
+
+`RecallTestBench` 使用同一套 `runEngine` 依次执行 8 个固定黄金场景，覆盖城市、设备、广告位及零兴趣、单兴趣、多兴趣和全兴趣请求。每个场景记录召回、过滤、粗排、精排数量，以及定向、兴趣、热门三路通道命中、多通道交集和执行耗时。
+
+当前自动断言包括：召回非空、合并结果不存在重复广告、粗排不超过 Top 30、精排不超过 Top 8。点击“运行全部场景”可重复执行，用于调整库存、定向规则或召回策略后的快速回归；汇总区同时给出断言通过率、平均召回量和空召回率。
 
 ## 7. 样式组织
 
