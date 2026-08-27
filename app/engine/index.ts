@@ -1,5 +1,5 @@
 import { calculateBilling } from "./billing";
-import { defaultStrategy } from "./config";
+import { defaultStrategy, interests } from "./config";
 import { ads } from "./data";
 import { filterAds } from "./filter";
 import { coarseRank, fineRank } from "./rank";
@@ -20,7 +20,7 @@ export function runEngineWithAds(
 ): EngineResult {
   const recalled = recallAds(inventory, request, strategy);
   const { rejected, filtered } = filterAds(recalled, request, strategy);
-  const coarse = coarseRank(filtered, strategy);
+  const coarse = coarseRank(filtered, strategy, request.interests ?? interests);
   const fine = fineRank(coarse, strategy);
   const billing = calculateBilling(fine);
 
@@ -28,7 +28,7 @@ export function runEngineWithAds(
 }
 
 export { ads } from "./data";
-export { defaultStrategy, interests } from "./config";
+export { defaultStrategy, interestOptions, interests } from "./config";
 export { calculateBilling } from "./billing";
 export { runAuction } from "./auction";
 export { calculateEcpm, coarseRank, fineRank } from "./rank";

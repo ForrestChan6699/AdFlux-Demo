@@ -94,6 +94,7 @@ page.tsx
 ### 4.1 数据模型
 
 - `RequestProfile`：城市、设备、广告场景和用户 ID。
+- `RequestProfile.interests`：请求级用户兴趣多选；为空时仅保留地域与热门召回。
 - `StrategyConfig`：热门召回阈值、频控上限、粗排/精排 Top K 及特征权重。
 - `BillingMode`：`CPM | CPC | CPA | oCPM`。
 - `Ad`：广告基础信息、定向条件、计费模式、出价、CTR、CVR、质量分、预算和频次。

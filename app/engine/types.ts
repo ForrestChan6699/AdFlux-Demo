@@ -3,6 +3,7 @@ export type RequestProfile = {
   device: string;
   scene: string;
   userId: string;
+  interests?: string[];
 };
 
 export type StrategyConfig = {

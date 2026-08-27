@@ -96,8 +96,11 @@ test("persists inventory and serves ad requests from the server", async () => {
   assert.match(route, /requestedAt\.toISOString\(\)/);
   assert.match(route, /timeZone: "Asia\/Shanghai"/);
   assert.match(route, /parseDatabaseUtc/);
+  assert.match(route, /interestOptions/);
   assert.match(migration, /CREATE TABLE `ad_requests`/);
   assert.match(migration, /CREATE TABLE `ads`/);
   assert.match(workbench, /fetch\("\/api\/ad\/request"/);
   assert.match(workbench, /data\.pipeline\.recalled/);
+  assert.match(workbench, /interestOptions\.map/);
+  assert.match(workbench, /aria-pressed/);
 });

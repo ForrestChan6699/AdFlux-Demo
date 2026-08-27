@@ -1,7 +1,7 @@
 import { desc, eq, like } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, placements } from "../../../../db/schema";
-import { ads as seedAds, runAuction, runEngineWithAds, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
+import { ads as seedAds, interestOptions, interests as defaultInterests, runAuction, runEngineWithAds, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
 import { releaseExpiredReservations, reserveBudget } from "../../../server/budget";
 
 type AdRequestPayload = Partial<RequestProfile> & {
@@ -26,6 +26,8 @@ function validatePayload(payload: AdRequestPayload): string | null {
   if (!payload.city?.trim()) return "city is required";
   if (!["iOS", "Android"].includes(payload.device ?? "")) return "device must be iOS or Android";
   if (!["信息流", "视频流"].includes(payload.scene ?? "")) return "scene must be 信息流 or 视频流";
+  if (payload.interests && (!Array.isArray(payload.interests)
+    || payload.interests.some((item) => !interestOptions.includes(item)))) return "interests contains unsupported values";
   return null;
 }
 
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
     const profile: RequestProfile = {
       userId: payload.userId!.trim(), city: payload.city!.trim(),
       device: payload.device!, scene: payload.scene!,
+      interests: payload.interests ?? defaultInterests,
     };
     const result = runEngineWithAds(inventory, profile, payload.strategy);
 
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
       city: profile.city, device: profile.device, scene: profile.scene,
       recalledCount: result.recalled.length, filteredCount: result.filtered.length,
       trackingToken, createdAt: requestedAt.toISOString(),
-      resultJson: { coarseCount: result.coarse.length, fineCount: result.fine.length },
+      resultJson: { coarseCount: result.coarse.length, fineCount: result.fine.length, interests: profile.interests },
     });
 
     let auction;
@@ -121,6 +124,7 @@ export async function POST(request: Request) {
         resultJson: {
           coarseCount: result.coarse.length, fineCount: result.fine.length,
           billingMode: auction.winner.billingMode, reservationId: reservation?.id,
+          interests: profile.interests,
         },
       }).where(eq(adRequests.id, requestId));
     }

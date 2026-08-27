@@ -1,4 +1,3 @@
-import { interests } from "./config";
 import type { RankedAd, StrategyConfig } from "./types";
 
 export function calculateEcpm(ad: RankedAd): number {
@@ -7,7 +6,7 @@ export function calculateEcpm(ad: RankedAd): number {
   return ad.bid * ad.ctr * ad.cvr * 1000;
 }
 
-export function coarseRank(ads: RankedAd[], strategy: StrategyConfig): RankedAd[] {
+export function coarseRank(ads: RankedAd[], strategy: StrategyConfig, interests: string[] = []): RankedAd[] {
   const weights = strategy.weights;
   return ads
     .map((ad) => ({

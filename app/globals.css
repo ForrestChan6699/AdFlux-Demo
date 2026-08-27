@@ -116,3 +116,28 @@ footer,
 @media (max-width: 850px) {
   .topbar nav button { font-size: 13px !important; }
 }
+
+.interest > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.interest > div button {
+  border: 1px solid #d8ddd6;
+  background: #fff;
+  color: #68716b;
+  border-radius: 5px;
+  padding: 7px 9px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.interest > div button.selected {
+  border-color: #789d36;
+  background: #e5efcf;
+  color: #49631c;
+  font-weight: 700;
+}
+.interest .clear-interests {
+  border: 0;
+  background: none;
+  color: #71806f;
+  padding: 8px 0 0;
+  font-size: 12px;
+  cursor: pointer;
+}
