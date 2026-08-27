@@ -193,6 +193,12 @@ npm run build
 - `npm test`：先执行生产构建，再检查服务端渲染、五阶段引擎和商业化模块。
 - `npm run build`：生成 Cloudflare Worker 兼容的部署产物。
 
+### 本地实时数据库
+
+开发服务器通过 Cloudflare Vite 插件的 `persistState` 将真实 D1 状态保存在项目内可见的 `local-data/v3/d1/miniflare-D1DatabaseObject/`。名称较长且不是 `metadata.sqlite` 的文件就是应用正在使用的 SQLite 数据库。Navicat 可直接连接该文件，修改广告、计划、广告主或广告位后，后续请求会立即读取新值，不再需要数据库镜像同步。
+
+`local-data/` 是本地运行状态并已加入 `.gitignore`，不会进入代码仓库或线上部署包。审计表的不可变触发器仍然生效。
+
 ## 9. 后续扩展建议
 
 广告库存与请求日志已经接入 D1；其他运营页面的交互状态仍保存在前端。若要继续向真实系统靠近，建议按以下边界拆分：

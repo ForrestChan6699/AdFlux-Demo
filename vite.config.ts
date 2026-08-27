@@ -53,6 +53,9 @@ export default defineConfig(async () => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
+        // Keep the live local D1 database in a normal, visible directory so
+        // desktop SQLite clients can open and edit the same file as the app.
+        persistState: { path: "local-data" },
       }),
     ],
   };

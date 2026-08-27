@@ -42,7 +42,6 @@ async function ensureCanonicalInventory() {
   for (let index = 0; index < rows.length; index += 5) {
     await db.insert(adTable).values(rows.slice(index, index + 5)).onConflictDoNothing();
   }
-  await db.update(adTable).set({ status: "active" }).where(eq(adTable.campaignId, "cmp_demo"));
   await db.update(adTable).set({ status: "paused" }).where(like(adTable.id, "local_ad_%"));
 }
 
