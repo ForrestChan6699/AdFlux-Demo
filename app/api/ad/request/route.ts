@@ -1,4 +1,4 @@
-import { desc, eq, like } from "drizzle-orm";
+import { and, desc, eq, like, lt } from "drizzle-orm";
 import { getD1, getDb } from "../../../../db";
 import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, experimentAssignments, placements, strategyVersions } from "../../../../db/schema";
 import { ads as seedAds, defaultStrategy, interestOptions, interests as defaultInterests, runAuction, runEngineWithDiagnostics, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
@@ -199,13 +199,21 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const rows = await getDb().select().from(adRequests).orderBy(desc(adRequests.createdAt)).limit(20);
-    return Response.json({ requests: rows.map((row) => {
+    const url = new URL(request.url);
+    const requestedLimit = Number(url.searchParams.get("limit") ?? 20);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > 100) return Response.json({ error: "limit must be between 1 and 100" }, { status: 400 });
+    const placementId = url.searchParams.get("placementId")?.trim();
+    const before = url.searchParams.get("before")?.trim();
+    if (before && Number.isNaN(new Date(before).getTime())) return Response.json({ error: "before must be an ISO timestamp" }, { status: 400 });
+    const conditions = [placementId ? eq(adRequests.placementId, placementId) : undefined, before ? lt(adRequests.createdAt, new Date(before).toISOString()) : undefined].filter(Boolean);
+    const rows = await getDb().select().from(adRequests).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(adRequests.createdAt)).limit(requestedLimit + 1);
+    const hasMore = rows.length > requestedLimit; const page = rows.slice(0, requestedLimit);
+    return Response.json({ requests: page.map((row) => {
       const createdAt = parseDatabaseUtc(row.createdAt);
       return { ...row, createdAt: createdAt.toISOString(), createdAtLocal: formatShanghaiTime(createdAt), timezone: "Asia/Shanghai" };
-    }) });
+    }), page: { limit: requestedLimit, hasMore, nextCursor: hasMore ? page.at(-1)?.createdAt ?? null : null } }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Unexpected error" }, { status: 500 });
   }

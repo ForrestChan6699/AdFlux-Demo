@@ -120,6 +120,8 @@ test("persists inventory and serves ad requests from the server", async () => {
   assert.match(route, /requestedAt\.toISOString\(\)/);
   assert.match(route, /timeZone: "Asia\/Shanghai"/);
   assert.match(route, /parseDatabaseUtc/);
+  assert.match(route, /nextCursor/);
+  assert.match(route, /limit must be between 1 and 100/);
   assert.match(route, /interestOptions/);
   assert.match(migration, /CREATE TABLE `ad_requests`/);
   assert.match(migration, /CREATE TABLE `ads`/);

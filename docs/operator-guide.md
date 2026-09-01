@@ -102,7 +102,7 @@ CPM/oCPM 在曝光确认，CPC 在点击确认，CPA 在转化确认。
 
 ```text
 POST /api/ad/request                 广告决策
-GET  /api/ad/request                 最近请求
+GET  /api/ad/request                 最近请求（limit/before/placementId 分页筛选）
 POST /api/events/{type}              事件上报
 GET  /api/events?requestId=...       事件查询
 GET  /api/ops/request/{requestId}    请求全链路
