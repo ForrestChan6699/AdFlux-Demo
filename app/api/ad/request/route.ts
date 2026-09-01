@@ -1,7 +1,7 @@
 import { desc, eq, like } from "drizzle-orm";
-import { getDb } from "../../../../db";
-import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, placements } from "../../../../db/schema";
-import { ads as seedAds, interestOptions, interests as defaultInterests, runAuction, runEngineWithAds, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
+import { getD1, getDb } from "../../../../db";
+import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, experimentAssignments, placements, strategyVersions } from "../../../../db/schema";
+import { ads as seedAds, defaultStrategy, interestOptions, interests as defaultInterests, runAuction, runEngineWithDiagnostics, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
 import { releaseExpiredReservations, reserveBudget } from "../../../server/budget";
 
 type AdRequestPayload = Partial<RequestProfile> & {
@@ -20,14 +20,33 @@ function formatShanghaiTime(date: Date): string {
   }).format(date);
 }
 
+function stableBucket(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) { hash ^= value.charCodeAt(index); hash = Math.imul(hash, 16777619); }
+  return (hash >>> 0) % 100;
+}
+
 function validatePayload(payload: AdRequestPayload): string | null {
   if (!payload.userId?.trim()) return "userId is required";
+  if (payload.userId.trim().length > 64) return "userId is too long";
   if (!payload.placementId?.trim()) return "placementId is required";
+  if (payload.placementId.trim().length > 64) return "placementId is too long";
+  if (payload.requestId && (!/^req_[a-zA-Z0-9_-]{1,80}$/.test(payload.requestId))) return "requestId format is invalid";
   if (!payload.city?.trim()) return "city is required";
+  if (payload.city.trim().length > 32) return "city is too long";
   if (!["iOS", "Android"].includes(payload.device ?? "")) return "device must be iOS or Android";
   if (!["信息流", "视频流"].includes(payload.scene ?? "")) return "scene must be 信息流 or 视频流";
   if (payload.interests && (!Array.isArray(payload.interests)
     || payload.interests.some((item) => !interestOptions.includes(item)))) return "interests contains unsupported values";
+  if (payload.interests && new Set(payload.interests).size !== payload.interests.length) return "interests contains duplicates";
+  if (payload.strategy) {
+    const value = payload.strategy;
+    if (!Number.isFinite(value.hotCtr) || value.hotCtr < 0 || value.hotCtr > 1) return "strategy.hotCtr is invalid";
+    if (!Number.isInteger(value.frequencyCap) || value.frequencyCap < 1 || value.frequencyCap > 100) return "strategy.frequencyCap is invalid";
+    if (!Number.isInteger(value.coarseTopK) || value.coarseTopK < 1 || value.coarseTopK > 500) return "strategy.coarseTopK is invalid";
+    if (!Number.isInteger(value.fineTopK) || value.fineTopK < 1 || value.fineTopK > value.coarseTopK) return "strategy.fineTopK is invalid";
+    if (!value.weights || !["ctr", "quality", "bid", "interest"].every((key) => { const weight = value.weights[key as keyof typeof value.weights]; return Number.isFinite(weight) && weight >= 0 && weight <= 10000; })) return "strategy.weights is invalid";
+  }
   return null;
 }
 
@@ -50,7 +69,7 @@ async function ensureCanonicalInventory() {
 async function loadInventory(): Promise<Ad[]> {
   const rows = await getDb().select().from(adTable)
     .where(eq(adTable.campaignId, "cmp_demo")).limit(200);
-  return rows.map(({ campaignId: _campaignId, createdAt: _createdAt, ...ad }) => ad);
+  return rows.map(({ campaignId, createdAt, ...ad }) => { void campaignId; void createdAt; return ad; });
 }
 
 export async function POST(request: Request) {
@@ -68,7 +87,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "placement is unavailable" }, { status: 404 });
     }
 
-    const inventory = await loadInventory();
+    const baseInventory = await loadInventory();
     const requestId = payload.requestId?.trim() || `req_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
     const trackingToken = `trk_${crypto.randomUUID().replaceAll("-", "")}`;
     const requestedAt = new Date();
@@ -77,19 +96,30 @@ export async function POST(request: Request) {
       device: payload.device!, scene: payload.scene!,
       interests: payload.interests ?? defaultInterests,
     };
-    const result = runEngineWithAds(inventory, profile, payload.strategy);
+    const frequencySince = new Date(requestedAt.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const frequencyResult = await getD1().prepare("SELECT e.ad_id,COUNT(*) AS count FROM ad_events e JOIN ad_requests r ON r.id=e.request_id WHERE r.user_id=? AND e.type='impression' AND e.valid=1 AND e.occurred_at>=? GROUP BY e.ad_id").bind(profile.userId, frequencySince).all<{ ad_id: string; count: number }>();
+    const frequencyByAd = new Map(frequencyResult.results.map((row) => [row.ad_id, Number(row.count)]));
+    const inventory = baseInventory.map((ad) => ({ ...ad, frequency: frequencyByAd.get(ad.id) ?? 0 }));
+    const [activeStrategy] = payload.strategy ? [] : await db.select().from(strategyVersions).where(eq(strategyVersions.status, "active")).limit(1);
+    const effectiveStrategy = payload.strategy ?? (activeStrategy?.configJson as unknown as StrategyConfig | undefined) ?? defaultStrategy;
+    const bucket = stableBucket(profile.userId); const variant = bucket < 50 ? "control" : "treatment";
+    const experimentStrategy = !payload.strategy && variant === "treatment" ? { ...effectiveStrategy, weights: { ...effectiveStrategy.weights, quality: effectiveStrategy.weights.quality * 1.1, interest: effectiveStrategy.weights.interest * 1.15 } } : effectiveStrategy;
+    const { result, diagnostics } = runEngineWithDiagnostics(inventory, profile, experimentStrategy);
+    const strategyVersion = payload.strategy ? "request_override" : activeStrategy?.id ?? "code_default";
 
     await db.insert(adRequests).values({
       id: requestId, userId: profile.userId, placementId: placement.id,
       city: profile.city, device: profile.device, scene: profile.scene,
       recalledCount: result.recalled.length, filteredCount: result.filtered.length,
       trackingToken, createdAt: requestedAt.toISOString(),
-      resultJson: { coarseCount: result.coarse.length, fineCount: result.fine.length, interests: profile.interests },
+      resultJson: { coarseCount: result.coarse.length, fineCount: result.fine.length, interests: profile.interests, diagnostics, strategyVersion, experiment: { id: "exp_rank_v4", variant, bucket } },
     });
+    await db.insert(experimentAssignments).values({ requestId, experimentId: "exp_rank_v4", userId: profile.userId, variant, bucket, createdAt: requestedAt.toISOString() });
 
     let auction;
     let reservation;
     let auctionCandidateCount = 0;
+    let budgetRejectedCount = 0;
     for (let offset = 0; offset < result.fine.length; offset += 1) {
       const candidateAuction = runAuction(
         result.fine.slice(offset), placement.auctionType as AuctionType, placement.floorEcpm,
@@ -105,6 +135,7 @@ export async function POST(request: Request) {
         auctionCandidateCount = result.fine.length - offset;
         break;
       }
+      budgetRejectedCount += 1;
     }
 
     if (auction) {
@@ -124,14 +155,15 @@ export async function POST(request: Request) {
         resultJson: {
           coarseCount: result.coarse.length, fineCount: result.fine.length,
           billingMode: auction.winner.billingMode, reservationId: reservation?.id,
-          interests: profile.interests,
+          interests: profile.interests, diagnostics, strategyVersion, experiment: { id: "exp_rank_v4", variant, bucket },
         },
       }).where(eq(adRequests.id, requestId));
     }
 
     const origin = new URL(request.url).origin;
+    const noFillReason = auction ? null : result.fine.length === 0 ? "no_ranked_candidate" : budgetRejectedCount > 0 ? "budget_unavailable" : "below_floor";
     return Response.json({
-      requestId, requestedAt: requestedAt.toISOString(), requestedAtLocal: formatShanghaiTime(requestedAt),
+      requestId, requestedAt: requestedAt.toISOString(), requestedAtLocal: formatShanghaiTime(requestedAt), strategyVersion,
       ad: auction ? {
         id: auction.winner.id, brand: auction.winner.brand, title: auction.winner.title,
         category: auction.winner.category, billingMode: auction.winner.billingMode,
@@ -146,6 +178,10 @@ export async function POST(request: Request) {
       } : null,
       budget: reservation ? { reservationId: reservation.id, amount: reservation.amount, status: reservation.status, expiresAt: reservation.expires_at } : null,
       pipeline: { inventory: inventory.length, recalled: result.recalled.length, filtered: result.filtered.length, coarse: result.coarse.length, fine: result.fine.length },
+      diagnostics,
+      delivery: { filled: !!auction, noFillReason, budgetRejectedCount },
+      frequency: { windowHours: 24, exposedAds: frequencyByAd.size },
+      experiment: { id: "exp_rank_v4", variant, bucket, applied: !payload.strategy && variant === "treatment" },
       candidates: {
         recalled: result.recalled, rejected: result.rejected,
         filtered: result.filtered, coarse: result.coarse, fine: result.fine,
@@ -156,7 +192,7 @@ export async function POST(request: Request) {
         clickUrl: `${origin}/api/events/click?token=${trackingToken}`,
         conversionUrl: `${origin}/api/events/conversion?token=${trackingToken}`,
       } : null,
-    });
+    }, { headers: { "cache-control": "no-store", "x-ad-request-id": requestId } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
     return Response.json({ error: message }, { status: message.includes("UNIQUE constraint failed") ? 409 : 500 });

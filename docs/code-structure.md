@@ -18,6 +18,10 @@ AdFlux 是一个基于 React 19、TypeScript、vinext 和 Cloudflare Worker 构�
 - 预算预占、事件扣费、超时释放与资金账本
 - 曝光、点击、转化事件幂等采集
 - 召回黄金场景回归、通道覆盖与空召回监控
+- D1 运行健康检查、资金对账修复与请求全链路追踪
+- 真实事件模拟、真实请求流和 5 秒监控刷新
+- 实时库存状态/出价管理及不可变操作审计
+- 单次决策阶段耗时、召回通道与过滤原因诊断
 
 ## 2. 目录结构
 
@@ -28,7 +32,16 @@ engine/
 │   ├── layout.tsx            # HTML 根布局、字体和页面元数据
 │   ├── AdWorkbench.tsx       # 在线决策、策略配置、监控和顶层导航
 │   ├── RecallTestBench.tsx   # 召回黄金场景、质量断言与通道统计
-│   ├── PlatformModules.tsx   # 投放、归因、风控和实验模块
+│   ├── OperationsCenter.tsx  # 数据一致性、预算安全与请求追踪
+│   ├── EventConsole.tsx      # 真实曝光/点击/转化上报控制台
+│   ├── LiveMonitor.tsx       # 基于 D1 的真实请求与事件监控
+│   ├── InventoryManager.tsx  # D1 库存搜索、启停、改价和审计查看
+│   ├── DecisionLab.tsx       # 请求画像、阶段候选及真实诊断
+│   ├── StrategyCenter.tsx    # 策略草稿、版本和生产激活
+│   ├── CampaignPortfolio.tsx # 计划预算、状态和账户余额
+│   ├── PlacementManager.tsx  # 广告位、拍卖方式和底价管理
+│   ├── RiskConsole.tsx       # 基于真实请求/事件的风险扫描
+│   ├── ExperimentConsole.tsx # 稳定分桶和真实实验指标
 │   ├── ad-engine.ts          # 广告引擎兼容导出入口
 │   ├── engine/
 │   │   ├── index.ts          # 五阶段统一编排和公共导出
@@ -54,6 +67,13 @@ engine/
 │   └── route.ts              # 曝光、点击、转化采集与幂等扣费
 ├── app/api/billing/ledger/
 │   └── route.ts              # 预算预占及资金账本查询
+├── app/api/ops/
+│   ├── health/route.ts       # 健康汇总、完整性检查与过期预占释放
+│   └── request/[id]/route.ts # 请求、拍卖、事件、预算和账本全链路
+├── app/api/inventory/
+│   └── route.ts              # 库存查询、幂等修改与操作审计
+├── app/api/{campaigns,placements,strategies,experiments}/
+│   └── route.ts              # 投放、广告位、策略和实验服务接口
 ├── app/server/
 │   └── budget.ts             # 预算原子预占、确认和超时释放
 ├── worker/
@@ -61,7 +81,8 @@ engine/
 ├── tests/
 │   └── rendered-html.test.mjs # 服务端渲染与核心能力检查
 ├── docs/
-│   └── code-structure.md     # 本文档
+│   ├── code-structure.md     # 本文档
+│   └── operator-guide.md     # 本地运营与验收手册
 ├── .openai/hosting.json      # Sites 项目及资源绑定配置
 ├── vite.config.ts            # vinext、Vite、Sites 构建配置
 ├── next.config.ts            # Next 兼容层配置
@@ -79,16 +100,16 @@ page.tsx
     │   ├── Profile             用户及请求画像
     │   ├── AdTable             各阶段候选明细
     │   └── Billing             胜出广告和计费结果
-    ├── Strategy                策略配置
-    ├── Monitor                 数据监控
+    ├── StrategyCenter          策略版本治理
+    ├── LiveMonitor             真实数据监控
     ├── RecallTestBench         召回测试台
-    ├── CampaignManager         广告主、计划、Pacing
-    ├── EventAttribution        事件模拟和转化归因
-    ├── RiskCenter              反作弊与风险告警
-    └── ExperimentCenter        A/B 实验
+    ├── InventoryManager        库存、计划与广告位管理
+    ├── EventConsole            真实事件闭环
+    ├── RiskConsole             数据库风险扫描
+    └── ExperimentConsole       稳定分桶 A/B 实验
 ```
 
-`AdWorkbench.tsx` 保存全局演示状态，并通过顶部导航选择模块。`PlatformModules.tsx` 放置相对独立的商业化功能，避免主工作台文件继续膨胀。
+`AdWorkbench.tsx` 只负责全局请求状态和顶部导航。决策实验室及各商业化模块均已拆分为独立组件，避免主工作台继续膨胀。
 
 ## 4. 核心广告引擎
 
@@ -140,16 +161,12 @@ oCPM eCPM = 目标转化出价 × pCTR × pCVR × 1000
 
 ## 5. 前端状态与交互
 
-在线请求、广告库存、事件与计费流水已由服务端接口和 D1 持久化；策略页和部分运营演示状态仍保存在 React 组件中：
+在线请求、广告库存、事件、资金流水、策略版本、操作审计和实验分桶均由服务端接口和 D1 持久化；React 只保存当前页面编辑态：
 
 - `request`：请求画像。
 - `strategy`：当前策略参数。
 - `active`：正在查看的决策阶段。
 - `runId`：每次运行请求时更新请求编号。
-- `events`：曝光、点击和转化计数。
-- `paused`：被暂停的投放计划。
-- `rules`：反作弊规则开关。
-- `allocation`：A/B 实验流量比例。
 
 请求画像或策略发生变化后，`useMemo` 会重新执行 `runEngine`，因此策略配置页、请求实验室和监控页共享同一份计算结果。
 
@@ -157,23 +174,23 @@ oCPM eCPM = 目标转化出价 × pCTR × pCVR × 1000
 
 ### 投放管理与 Pacing
 
-`CampaignManager` 展示广告主余额、计划预算、消耗进度、计费模式和启停状态。Pacing 图将小时级理想消耗与实际消耗进行比较。
+`InventoryManager`、`CampaignPortfolio` 和 `PlacementManager` 直接管理 D1 广告、计划和广告位。启停、改价、日预算、拍卖方式和底价修改即时生效，并写入不可更新/删除的操作审计。
 
 ### 事件模拟与归因
 
-`EventAttribution` 可以触发可见曝光、有效点击和购买转化，并维护近期事件日志。归因区域对比末次点击、首次触点、线性归因和时间衰减模型。
+`EventConsole` 使用胜出广告的签名追踪链接调用真实事件 API，执行曝光、点击、转化顺序校验、幂等写入和按计费模式清算，并读取数据库事件明细。
 
 ### 反作弊
 
-`RiskCenter` 包含设备指纹、点击频率、IP 信誉和异常转化规则。当前规则开关只影响界面状态，风险数据为固定演示数据。
+`RiskConsole` 每 10 秒扫描真实请求与事件，检查事件顺序违规、点击后一秒内转化、高频请求用户和胜出后长期无曝光。
 
 ### A/B 实验
 
-`ExperimentCenter` 支持调整对照组和实验组流量，展示 eCPM、CTR、CVR、留存和统计显著性结果。
+`ExperimentConsole` 按用户 ID 稳定分桶并持久化请求级实验曝光。对照/实验指标由真实拍卖、曝光、点击和转化聚合；实验分桶记录不可修改或删除。
 
 ### 数据监控
 
-`Monitor` 展示 QPS、填充率、平均 eCPM、P99 延迟、实时漏斗、阶段耗时及近期请求流。
+`LiveMonitor` 每 5 秒读取 D1，展示 24 小时请求、填充率、平均清算 eCPM、事件量、真实候选漏斗和最近请求流。
 
 ### 召回测试台
 
@@ -248,11 +265,11 @@ Content-Type: application/json
 
 每次成功拍卖都会写入 `auction_logs`，保存竞价类型、胜出者、第二名、底价、清算 eCPM、计费事件和候选数量。`GET /api/billing/ledger` 同时返回账户、预算预占、资金流水和拍卖审计。
 
-数据库迁移为 `billing_ledger`、`auction_logs` 和 `ad_events` 建立禁止 `UPDATE/DELETE` 的触发器。资金或审计修正只能追加退款/调账记录，不能覆盖历史；预算预占也只能从 `reserved` 单向进入 `charged` 或 `released`。
+数据库迁移为 `billing_ledger`、`auction_logs`、`ad_events`、`operation_audit_logs` 和 `experiment_assignments` 建立禁止 `UPDATE/DELETE` 的触发器。资金或审计修正只能追加记录，不能覆盖历史；预算预占也只能从 `reserved` 单向进入 `charged` 或 `released`。
 
 1. 增加退款、人工调账审批和日终对账任务。
-2. 对事件加入可见性验证、签名、风险评分和归因窗口计算。
-3. 为每个策略版本保存配置快照，支持灰度、回滚和审计。
-4. 将固定监控数据替换为事件聚合指标和告警规则。
+2. 对事件加入服务端可见性证明、设备指纹、IP 信誉和更完整的风险评分。
+3. 为策略版本补充审批流、按百分比灰度、指标护栏和一键回滚。
+4. 接入生产级指标系统、分布式追踪和主动告警通知。
 
 为了保持现有页面稳定，新增领域逻辑应优先放到独立模块中，再由 `AdWorkbench` 负责组合，避免把算法、数据和展示继续集中在单一组件。

@@ -60,6 +60,12 @@ export type EngineResult = {
   billing?: RankedAd;
 };
 
+export type EngineDiagnostics = {
+  timingsMs: { recall: number; filter: number; coarse: number; fine: number; billing: number; total: number };
+  recallChannels: Record<string, number>;
+  filterReasons: Record<string, number>;
+};
+
 export type AuctionResult = {
   winner: RankedAd;
   runnerUp?: RankedAd;

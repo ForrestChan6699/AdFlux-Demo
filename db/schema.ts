@@ -123,3 +123,41 @@ export const adEvents = sqliteTable("ad_events", {
   uniqueIndex("idx_ad_events_idempotency").on(table.idempotencyKey),
   index("idx_ad_events_request_type").on(table.requestId, table.type),
 ]);
+
+export const operationAuditLogs = sqliteTable("operation_audit_logs", {
+  id: text("id").primaryKey(),
+  actor: text("actor").notNull(),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id").notNull(),
+  beforeJson: text("before_json", { mode: "json" }).$type<Record<string, unknown>>(),
+  afterJson: text("after_json", { mode: "json" }).$type<Record<string, unknown>>(),
+  requestId: text("request_id").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex("idx_operation_audit_request").on(table.requestId),
+  index("idx_operation_audit_resource").on(table.resourceType, table.resourceId),
+  index("idx_operation_audit_created_at").on(table.createdAt),
+]);
+
+export const strategyVersions = sqliteTable("strategy_versions", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  status: text("status", { enum: ["draft", "active", "archived"] }).notNull().default("draft"),
+  configJson: text("config_json", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  activatedAt: text("activated_at"),
+}, (table) => [index("idx_strategy_versions_status").on(table.status)]);
+
+export const experimentAssignments = sqliteTable("experiment_assignments", {
+  requestId: text("request_id").primaryKey().references(() => adRequests.id),
+  experimentId: text("experiment_id").notNull(),
+  userId: text("user_id").notNull(),
+  variant: text("variant", { enum: ["control", "treatment"] }).notNull(),
+  bucket: integer("bucket").notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  index("idx_experiment_variant").on(table.experimentId, table.variant),
+  index("idx_experiment_user").on(table.experimentId, table.userId),
+]);

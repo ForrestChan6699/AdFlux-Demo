@@ -16,7 +16,7 @@ test("server renders the ad decision workbench", async () => {
   assert.match(html, /<title>AdFlux 广告决策台<\/title>/);
   assert.match(html, /一次请求/);
   assert.match(html, /召回/);
-  assert.match(html, /GSP 竞价/);
+  assert.match(html, /拍卖清算/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
 });
 
@@ -70,14 +70,19 @@ test("implements budget safety, event idempotency and immutable ledger", async (
   assert.match(hardeningMigration, /budget_reservations_guard_update/);
 });
 
-test("includes commercial operations, attribution, fraud and experiments", async () => {
-  const source = await readFile(new URL("../app/PlatformModules.tsx", import.meta.url), "utf8");
-  assert.match(source, /BUDGET PACING/);
-  assert.match(source, /oCPM/);
-  assert.match(source, /事件模拟器/);
-  assert.match(source, /归因模型对比/);
-  assert.match(source, /设备指纹聚类/);
-  assert.match(source, /A\/B 实验/);
+test("includes database-backed commercial operations and experiments", async () => {
+  const [campaigns, events, risk, experiment, placements] = await Promise.all([
+    readFile(new URL("../app/CampaignPortfolio.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/EventConsole.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/RiskConsole.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/ExperimentConsole.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/PlacementManager.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(campaigns, /真实投放计划/);
+  assert.match(events, /真实事件模拟器/);
+  assert.match(risk, /真实异常请求/);
+  assert.match(experiment, /稳定分桶/);
+  assert.match(placements, /广告位与拍卖规则/);
 });
 
 test("includes a repeatable recall quality test bench", async () => {
@@ -99,17 +104,18 @@ test("includes a repeatable recall quality test bench", async () => {
 });
 
 test("persists inventory and serves ad requests from the server", async () => {
-  const [schema, route, migration, workbench] = await Promise.all([
+  const [schema, route, migration, workbench, lab] = await Promise.all([
     readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../drizzle/0000_tan_squirrel_girl.sql", import.meta.url), "utf8"),
     readFile(new URL("../app/AdWorkbench.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/DecisionLab.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(schema, /advertisers/);
   assert.match(schema, /campaigns/);
   assert.match(schema, /adRequests/);
   assert.match(route, /export async function POST/);
-  assert.match(route, /runEngineWithAds/);
+  assert.match(route, /runEngineWithDiagnostics/);
   assert.match(route, /impressionUrl/);
   assert.match(route, /requestedAt\.toISOString\(\)/);
   assert.match(route, /timeZone: "Asia\/Shanghai"/);
@@ -119,6 +125,62 @@ test("persists inventory and serves ad requests from the server", async () => {
   assert.match(migration, /CREATE TABLE `ads`/);
   assert.match(workbench, /fetch\("\/api\/ad\/request"/);
   assert.match(workbench, /data\.pipeline\.recalled/);
-  assert.match(workbench, /interestOptions\.map/);
-  assert.match(workbench, /aria-pressed/);
+  assert.match(lab, /interestOptions\.map/);
+  assert.match(lab, /aria-pressed/);
+});
+
+test("provides real operations health, tracing and event consoles", async () => {
+  const [health, trace, operations, events, monitor] = await Promise.all([
+    readFile(new URL("../app/api/ops/health/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/ops/request/[id]/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/OperationsCenter.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/EventConsole.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/LiveMonitor.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(health, /expired_reserved/);
+  assert.match(health, /releaseExpiredReservations/);
+  assert.match(trace, /auction_logs/);
+  assert.match(trace, /billing_ledger/);
+  assert.match(operations, /请求全链路诊断/);
+  assert.match(events, /idempotency-key/);
+  assert.match(events, /真实事件模拟器/);
+  assert.match(monitor, /真实请求流/);
+  assert.match(monitor, /setInterval\(refresh, 5_000\)/);
+});
+
+test("provides diagnosed decisions and audited inventory operations", async () => {
+  const [engine, request, inventory, manager, migration] = await Promise.all([
+    readFile(new URL("../app/engine/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/inventory/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/InventoryManager.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0004_fast_karma.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(engine, /runEngineWithDiagnostics/);
+  assert.match(engine, /filterReasons/);
+  assert.match(request, /diagnostics/);
+  assert.match(inventory, /idempotency-key/);
+  assert.match(inventory, /operation_audit_logs/);
+  assert.match(manager, /修改即生效/);
+  assert.match(manager, /最近操作审计/);
+  assert.match(migration, /operation_audit_logs_no_update/);
+  assert.match(migration, /operation audit log is append-only/);
+});
+
+test("governs strategies, placements, campaigns and stable experiments", async () => {
+  const [strategies, placements, campaigns, request, experiments, migration] = await Promise.all([
+    readFile(new URL("../app/api/strategies/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/placements/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/campaigns/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/ad/request/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/experiments/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../drizzle/0006_closed_mister_sinister.sql", import.meta.url), "utf8"),
+  ]);
+  assert.match(strategies, /strategy_versions/);
+  assert.match(placements, /floor_ecpm/);
+  assert.match(campaigns, /dailyBudget cannot be lower/);
+  assert.match(request, /stableBucket/);
+  assert.match(request, /frequencyByAd/);
+  assert.match(experiments, /experiment_assignments/);
+  assert.match(migration, /experiment_assignments_no_update/);
 });
