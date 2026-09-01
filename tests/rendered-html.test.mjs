@@ -184,3 +184,10 @@ test("governs strategies, placements, campaigns and stable experiments", async (
   assert.match(experiments, /experiment_assignments/);
   assert.match(migration, /experiment_assignments_no_update/);
 });
+
+test("exposes a database-backed readiness probe", async () => {
+  const source = await readFile(new URL("../app/api/healthz/route.ts", import.meta.url), "utf8");
+  assert.match(source, /SELECT 1 AS ready/);
+  assert.match(source, /status: 503/);
+  assert.match(source, /cache-control/);
+});

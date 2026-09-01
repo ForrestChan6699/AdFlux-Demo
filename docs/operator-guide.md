@@ -115,6 +115,7 @@ GET/PATCH /api/placements            广告位与底价
 GET/POST/PATCH /api/strategies       策略版本
 GET  /api/experiments                实验指标
 GET  /api/billing/ledger             资金与拍卖流水
+GET  /api/healthz                    服务与数据库就绪探针
 ```
 
 所有管理修改使用 `Idempotency-Key` 防止重复操作，并写入操作审计。当前 Demo 的操作者通过 `X-Operator` 标识；商用部署还需要接入真实身份认证和角色权限。
