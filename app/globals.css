@@ -150,3 +150,18 @@ footer,
 .recall-channel-bars b { text-align: right; }
 .recall-bench .campaign-table table { min-width: 980px; }
 .recall-bench .campaign-table td small { line-height: 1.5; }
+.recall-actions { display: flex; gap: 10px; align-items: center; }
+.recall-config-grid { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 12px; }
+.threshold-fields, .custom-case-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.threshold-fields label, .custom-case-fields label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.threshold-fields input, .custom-case-fields input, .custom-case-fields select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid #d8d8cf; border-radius: 7px; color: #17211c; background: #fff; font: inherit; }
+.custom-interests { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.custom-interests button { padding: 6px 10px; border: 1px solid #d8d8cf; border-radius: 999px; background: transparent; color: #6b736e; cursor: pointer; }
+.secondary-button { border: 1px solid #c9cec7; border-radius: 7px; padding: 9px 13px; background: #fff; color: #26332c; font: inherit; font-weight: 700; cursor: pointer; }
+.custom-interests button[aria-pressed="true"] { border-color: #789d36; color: #55751f; background: #edf4df; }
+.failure-filter { display: flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; }
+.failed-row { background: #fff8f5; }
+.failed-reasons { color: #b75038 !important; max-width: 220px; }
+.text-button { border: 0; padding: 0; color: #b75038; background: transparent; cursor: pointer; }
+.empty-test-state { padding: 30px; text-align: center; color: var(--muted); }
+@media (max-width: 900px) { .recall-config-grid { grid-template-columns: 1fr; } .threshold-fields, .custom-case-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

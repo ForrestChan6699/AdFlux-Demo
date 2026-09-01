@@ -85,11 +85,15 @@ test("includes a repeatable recall quality test bench", async () => {
     readFile(new URL("../app/RecallTestBench.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/AdWorkbench.tsx", import.meta.url), "utf8"),
   ]);
-  assert.match(bench, /const scenarios/);
+  assert.match(bench, /const goldenScenarios/);
   assert.match(bench, /合并无重复/);
   assert.match(bench, /空召回率/);
   assert.match(bench, /运行全部场景/);
   assert.match(bench, /channels\.targeting/);
+  assert.match(bench, /新增测试场景/);
+  assert.match(bench, /最大耗时/);
+  assert.match(bench, /导出 JSON/);
+  assert.match(bench, /只看失败/);
   assert.match(workbench, /recalltest/);
   assert.match(workbench, /召回测试/);
 });
