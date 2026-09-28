@@ -1,8 +1,8 @@
-# AdFlux 广告引擎 Demo
+# AdFlux Ad Engine Demo
 
-一个运行在 [vinext](https://github.com/cloudflare/vinext) + Cloudflare Worker + D1 上的广告平台沙盘：多路召回、过滤、粗排、精排、一价/GSP 拍卖、多计费模式清算、预算预占与事件扣费、不可变审计、A/B 实验、召回服务端回放和分时 Pacing 集中在一个控制台中。
+An advertising platform sandbox built with [vinext](https://github.com/cloudflare/vinext), Cloudflare Workers, and D1. A single console brings together multi-channel candidate retrieval, filtering, coarse and fine ranking, first-price and generalized second-price (GSP) auctions, settlement across multiple billing models, budget reservation and event-based charging, immutable audit logs, A/B experiments, server-side retrieval replay, and time-based budget pacing.
 
-代码结构、核心数据流和扩展说明请参阅 [docs/code-structure.md](docs/code-structure.md)，本地验收手册见 [docs/operator-guide.md](docs/operator-guide.md)，商用化剩余差距见 [docs/production-gap-analysis.md](docs/production-gap-analysis.md)。
+See the [code structure guide](docs/code-structure.md) for the architecture, core data flows, and extension points; the [operator guide](docs/operator-guide.md) for local operation and acceptance checks; and the [production gap analysis](docs/production-gap-analysis.md) for remaining work toward commercial deployment. These supporting documents are currently in Chinese.
 
 ## Prerequisites
 
@@ -12,17 +12,17 @@
 
 ```bash
 npm install
-npm run dev      # 本地开发服务（Cloudflare Vite 插件模拟 D1 绑定）
-npm test         # 生产构建 + 渲染检查 + 行为级集成测试
-npm run build    # 生成 Cloudflare Worker 部署产物
+npm run dev      # Start the local dev server with simulated D1 bindings via the Cloudflare Vite plugin
+npm test         # Build for production and run rendering checks and behavioral integration tests
+npm run build    # Generate Cloudflare Worker deployment artifacts
 ```
 
 ## Testing
 
-`npm test` 执行两组测试：
+`npm test` builds the application and runs two test suites:
 
-- `tests/rendered-html.test.mjs`：服务端渲染与核心能力声明检查。
-- `tests/api-behavior.test.mjs`：通过 module loader 把 `cloudflare:workers` 替换为测试 shim，注入应用了全部迁移（含不可变触发器）的内存 D1，对构建产物发起真实 HTTP 调用，覆盖广告决策、事件顺序与幂等扣费、账本对账、过期预占释放、频控、操作审计幂等、分时 Pacing 和召回服务端回放。
+- `tests/rendered-html.test.mjs`: checks server-rendered HTML and the presence of core capabilities.
+- `tests/api-behavior.test.mjs`: uses a module loader to replace `cloudflare:workers` with a test shim and injects an in-memory D1-compatible database with all migrations applied, including immutability triggers. It sends HTTP requests to the built Worker to verify ad decisions, event ordering, idempotent charging, ledger reconciliation, expired reservation release, frequency capping, audit idempotency, time-based pacing, and server-side retrieval replay.
 
 ## Workspace Auth Headers
 
@@ -56,7 +56,7 @@ export default async function Home() {
 
 ## Optional Dispatch-Owned ChatGPT Sign-In
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in (尚未接入管理接口，见 production-gap-analysis 的下一阶段计划):
+Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in (not yet integrated into the management APIs; see the next-phase plan in the [production gap analysis](docs/production-gap-analysis.md)):
 
 - Use `getChatGPTUser()` for optional signed-in UI.
 - Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
