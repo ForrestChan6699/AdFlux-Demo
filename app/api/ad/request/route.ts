@@ -1,8 +1,9 @@
-import { and, desc, eq, like, lt } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { getD1, getDb } from "../../../../db";
-import { adRequests, ads as adTable, advertisers, auctionLogs, campaigns, experimentAssignments, placements, strategyVersions } from "../../../../db/schema";
-import { ads as seedAds, defaultStrategy, interestOptions, interests as defaultInterests, runAuction, runEngineWithDiagnostics, type Ad, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
+import { adRequests, auctionLogs, experimentAssignments, placements, strategyVersions } from "../../../../db/schema";
+import { defaultStrategy, interestOptions, interests as defaultInterests, runAuction, runEngineWithDiagnostics, type AuctionType, type RequestProfile, type StrategyConfig } from "../../../engine";
 import { releaseExpiredReservations, reserveBudget } from "../../../server/budget";
+import { ensureCanonicalInventory, loadInventory } from "../../../server/inventory";
 
 type AdRequestPayload = Partial<RequestProfile> & {
   placementId?: string; requestId?: string; strategy?: StrategyConfig;
@@ -50,26 +51,10 @@ function validatePayload(payload: AdRequestPayload): string | null {
   return null;
 }
 
-async function ensureCanonicalInventory() {
-  const db = getDb();
-  await db.insert(placements).values([
-    { id: "feed_home", name: "首页信息流", auctionType: "gsp", floorEcpm: 8 },
-    { id: "video_recommend", name: "推荐视频流", auctionType: "first_price", floorEcpm: 12 },
-  ]).onConflictDoNothing();
-
-  await db.insert(advertisers).values({ id: "adv_demo", name: "AdFlux 演示广告主", balance: 1_000_000 }).onConflictDoNothing();
-  await db.insert(campaigns).values({ id: "cmp_demo", advertiserId: "adv_demo", name: "全量演示计划", dailyBudget: 500_000 }).onConflictDoNothing();
-  const rows = seedAds.map((ad) => ({ ...ad, campaignId: "cmp_demo" }));
-  for (let index = 0; index < rows.length; index += 5) {
-    await db.insert(adTable).values(rows.slice(index, index + 5)).onConflictDoNothing();
-  }
-  await db.update(adTable).set({ status: "paused" }).where(like(adTable.id, "local_ad_%"));
-}
-
-async function loadInventory(): Promise<Ad[]> {
-  const rows = await getDb().select().from(adTable)
-    .where(eq(adTable.campaignId, "cmp_demo")).limit(200);
-  return rows.map(({ campaignId, createdAt, ...ad }) => { void campaignId; void createdAt; return ad; });
+async function loadPlacement(id: string) {
+  const [placement] = await getDb().select().from(placements)
+    .where(eq(placements.id, id)).limit(1);
+  return placement;
 }
 
 export async function POST(request: Request) {
@@ -81,8 +66,7 @@ export async function POST(request: Request) {
     await ensureCanonicalInventory();
     await releaseExpiredReservations();
     const db = getDb();
-    const [placement] = await db.select().from(placements)
-      .where(eq(placements.id, payload.placementId!)).limit(1);
+    const placement = await loadPlacement(payload.placementId!);
     if (!placement || placement.status !== "active") {
       return Response.json({ error: "placement is unavailable" }, { status: 404 });
     }
@@ -194,8 +178,12 @@ export async function POST(request: Request) {
       } : null,
     }, { headers: { "cache-control": "no-store", "x-ad-request-id": requestId } });
   } catch (error) {
+    // Drizzle wraps driver errors as "Failed query: ..." and keeps the driver
+    // message on `cause`, so inspect both layers before deciding on a conflict.
     const message = error instanceof Error ? error.message : "Unexpected error";
-    return Response.json({ error: message }, { status: message.includes("UNIQUE constraint failed") ? 409 : 500 });
+    const cause = error instanceof Error && error.cause instanceof Error ? error.cause.message : "";
+    const uniqueViolation = message.includes("UNIQUE constraint failed") || cause.includes("UNIQUE constraint failed");
+    return Response.json({ error: uniqueViolation ? "requestId already exists" : message }, { status: uniqueViolation ? 409 : 500 });
   }
 }
 

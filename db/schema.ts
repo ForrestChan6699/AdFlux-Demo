@@ -12,7 +12,7 @@ export const campaigns = sqliteTable("campaigns", {
   id: text("id").primaryKey(),
   advertiserId: text("advertiser_id").notNull().references(() => advertisers.id),
   name: text("name").notNull(), dailyBudget: real("daily_budget").notNull(),
-  spent: real("spent").notNull().default(0),
+  spent: real("spent").notNull().default(0), pacingMode: text("pacing_mode", { enum: ["asap", "even"] }).notNull().default("asap"),
   status: text("status", { enum: ["active", "paused", "ended"] }).notNull().default("active"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });

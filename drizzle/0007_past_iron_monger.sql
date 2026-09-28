@@ -1,0 +1,1 @@
+ALTER TABLE `campaigns` ADD `pacing_mode` text DEFAULT 'asap' NOT NULL;

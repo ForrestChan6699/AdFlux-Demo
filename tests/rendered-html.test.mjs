@@ -91,7 +91,7 @@ test("includes a repeatable recall quality test bench", async () => {
     readFile(new URL("../app/AdWorkbench.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(bench, /const goldenScenarios/);
-  assert.match(bench, /合并无重复/);
+  assert.match(bench, /api\/ops\/recall-suite/);
   assert.match(bench, /空召回率/);
   assert.match(bench, /运行全部场景/);
   assert.match(bench, /channels\.targeting/);
@@ -181,6 +181,7 @@ test("governs strategies, placements, campaigns and stable experiments", async (
   assert.match(strategies, /strategy_versions/);
   assert.match(placements, /floor_ecpm/);
   assert.match(campaigns, /dailyBudget cannot be lower/);
+  assert.match(campaigns, /pacingMode must be asap or even/);
   assert.match(request, /stableBucket/);
   assert.match(request, /frequencyByAd/);
   assert.match(experiments, /experiment_assignments/);

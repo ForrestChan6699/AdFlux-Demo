@@ -5,13 +5,21 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const status = url.searchParams.get("status");
     const query = url.searchParams.get("q")?.trim() ?? "";
+    const page = Number(url.searchParams.get("page") ?? 1);
+    const pageSize = Number(url.searchParams.get("pageSize") ?? 20);
+    if (!Number.isInteger(page) || page < 1) return Response.json({ error: "page must be a positive integer" }, { status: 400 });
+    if (![10, 20, 50].includes(pageSize)) return Response.json({ error: "pageSize must be 10, 20 or 50" }, { status: 400 });
     const conditions: string[] = ["1=1"]; const bindings: unknown[] = [];
     if (status && ["active", "paused"].includes(status)) { conditions.push("a.status = ?"); bindings.push(status); }
     if (query) { conditions.push("(a.id LIKE ? OR a.brand LIKE ? OR a.title LIKE ?)"); bindings.push(`%${query}%`, `%${query}%`, `%${query}%`); }
     const d1 = getD1();
-    const statement = d1.prepare(`SELECT a.id,a.brand,a.title,a.category,a.billing_mode,a.bid,a.ctr,a.cvr,a.quality,a.budget,a.frequency,a.status,a.campaign_id,c.name AS campaign_name,c.daily_budget,c.spent,c.status AS campaign_status,v.name AS advertiser_name FROM ads a JOIN campaigns c ON c.id=a.campaign_id JOIN advertisers v ON v.id=c.advertiser_id WHERE ${conditions.join(" AND ")} ORDER BY a.id LIMIT 250`).bind(...bindings);
-    const [items, summary, audits] = await d1.batch([statement, d1.prepare("SELECT status,COUNT(*) AS count FROM ads GROUP BY status"), d1.prepare("SELECT * FROM operation_audit_logs WHERE resource_type='ad' ORDER BY created_at DESC LIMIT 20")]);
-    return Response.json({ items: items.results, summary: summary.results, audits: audits.results });
+    const where = conditions.join(" AND ");
+    const statement = d1.prepare(`SELECT a.id,a.brand,a.title,a.category,a.billing_mode,a.bid,a.ctr,a.cvr,a.quality,a.budget,a.frequency,a.status,a.campaign_id,c.name AS campaign_name,c.daily_budget,c.spent,c.status AS campaign_status,v.name AS advertiser_name FROM ads a JOIN campaigns c ON c.id=a.campaign_id JOIN advertisers v ON v.id=c.advertiser_id WHERE ${where} ORDER BY a.id LIMIT ? OFFSET ?`).bind(...bindings, pageSize, (page - 1) * pageSize);
+    const countStatement = d1.prepare(`SELECT COUNT(*) AS total FROM ads a WHERE ${where}`).bind(...bindings);
+    const [items, count, summary, audits] = await d1.batch([statement, countStatement, d1.prepare("SELECT status,COUNT(*) AS count FROM ads GROUP BY status"), d1.prepare("SELECT * FROM operation_audit_logs WHERE resource_type='ad' ORDER BY created_at DESC LIMIT 20")]);
+    const total = Number((count.results[0] as { total?: number } | undefined)?.total ?? 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    return Response.json({ items: items.results, summary: summary.results, audits: audits.results, pagination: { page, pageSize, total, totalPages } });
   } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Unexpected error" }, { status: 500 }); }
 }
 

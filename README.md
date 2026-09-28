@@ -1,10 +1,8 @@
 # AdFlux 广告引擎 Demo
 
-代码结构、核心数据流和扩展说明请参阅 [docs/code-structure.md](docs/code-structure.md)。
+一个运行在 [vinext](https://github.com/cloudflare/vinext) + Cloudflare Worker + D1 上的广告平台沙盘：多路召回、过滤、粗排、精排、一价/GSP 拍卖、多计费模式清算、预算预占与事件扣费、不可变审计、A/B 实验、召回服务端回放和分时 Pacing 集中在一个控制台中。
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+代码结构、核心数据流和扩展说明请参阅 [docs/code-structure.md](docs/code-structure.md)，本地验收手册见 [docs/operator-guide.md](docs/operator-guide.md)，商用化剩余差距见 [docs/production-gap-analysis.md](docs/production-gap-analysis.md)。
 
 ## Prerequisites
 
@@ -14,20 +12,17 @@ Drizzle support.
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run dev      # 本地开发服务（Cloudflare Vite 插件模拟 D1 绑定）
+npm test         # 生产构建 + 渲染检查 + 行为级集成测试
+npm run build    # 生成 Cloudflare Worker 部署产物
 ```
 
-This starter does not use `wrangler.jsonc`.
+## Testing
 
-## Included Shape
+`npm test` 执行两组测试：
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+- `tests/rendered-html.test.mjs`：服务端渲染与核心能力声明检查。
+- `tests/api-behavior.test.mjs`：通过 module loader 把 `cloudflare:workers` 替换为测试 shim，注入应用了全部迁移（含不可变触发器）的内存 D1，对构建产物发起真实 HTTP 调用，覆盖广告决策、事件顺序与幂等扣费、账本对账、过期预占释放、频控、操作审计幂等、分时 Pacing 和召回服务端回放。
 
 ## Workspace Auth Headers
 
@@ -35,10 +30,7 @@ Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticat
 
 The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
 
 Treat the full name as optional and fall back to email when it is absent:
 
@@ -64,39 +56,19 @@ export default async function Home() {
 
 ## Optional Dispatch-Owned ChatGPT Sign-In
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in (尚未接入管理接口，见 production-gap-analysis 的下一阶段计划):
 
 - Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
+- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for browser links or actions.
+- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out. The helper validates and safely encodes it.
+- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity headers.
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths.
 
 ## Useful Commands
 
 - `npm run dev`: start local development
 - `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm test`: build the Worker and run render + behavioral tests
 - `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)

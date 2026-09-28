@@ -5,6 +5,7 @@ import { defaultStrategy, runEngine, type EngineResult, type RequestProfile, typ
 import DecisionLab, { type DecisionDiagnostics } from "./DecisionLab";
 import EventAttribution from "./EventConsole";
 import ExperimentCenter from "./ExperimentConsole";
+import AdvertiserConsole from "./AdvertiserConsole";
 import InventoryManager from "./InventoryManager";
 import LiveMonitor from "./LiveMonitor";
 import OperationsCenter from "./OperationsCenter";
@@ -56,6 +57,7 @@ export default function AdWorkbench() {
     lab: <DecisionLab request={request} setRequest={setRequest} result={result} counts={counts} active={active} setActive={setActive} requestId={serverMeta.requestId} error={serverMeta.error} diagnostics={serverMeta.diagnostics} delivery={serverMeta.delivery}/>,
     strategy: <StrategyCenter strategy={strategy} setStrategy={setStrategy}/>,
     campaign: <InventoryManager/>,
+    advertiser: <AdvertiserConsole/>,
     events: <EventAttribution winner={result.billing} requestId={serverMeta.requestId} tracking={serverMeta.tracking}/>,
     risk: <RiskCenter/>, experiment: <ExperimentCenter/>, recalltest: <RecallTestBench/>,
     operations: <OperationsCenter/>, monitor: <LiveMonitor/>,
@@ -64,6 +66,6 @@ export default function AdWorkbench() {
 }
 
 function Header({ tab, setTab, run, running }: { tab: string; setTab: (value: string) => void; run: () => void; running: boolean }) {
-  const nav = [["lab", "决策"], ["strategy", "策略"], ["campaign", "投放"], ["events", "归因"], ["risk", "风控"], ["experiment", "实验"], ["recalltest", "召回测试"], ["operations", "运行健康"], ["monitor", "监控"]];
+  const nav = [["advertiser", "投放"], ["campaign", "运营"], ["strategy", "策略"], ["lab", "决策"], ["events", "归因"], ["experiment", "实验"], ["recalltest", "召回测试"], ["risk", "风控"], ["operations", "运行健康"], ["monitor", "监控"]];
   return <header className="topbar"><div className="brand-mark">A</div><div className="brand-copy"><strong>AdFlux</strong><span>广告决策台</span></div><nav>{nav.map(([id, name]) => <button key={id} className={tab === id ? "nav-active" : ""} onClick={() => setTab(id)}>{name}</button>)}</nav><div className="status"><i/> 本地运行</div><button className="run-button" onClick={run} disabled={running}>▶ {running ? "决策中…" : "运行请求"}</button></header>;
 }

@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /.vinext/
+*.tsbuildinfo
 /out/
 
 # misc

@@ -22,6 +22,9 @@ AdFlux 是一个基于 React 19、TypeScript、vinext 和 Cloudflare Worker 构�
 - 真实事件模拟、真实请求流和 5 秒监控刷新
 - 实时库存状态/出价管理及不可变操作审计
 - 单次决策阶段耗时、召回通道与过滤原因诊断
+- 召回黄金场景服务端回放（D1 真实库存与生产策略版本）
+- Campaign 分时匀速 Pacing（asap/even 按上海投放日线性放预算）
+- 基于真实 Worker 调用与内存 D1 的行为级集成测试
 
 ## 2. 目录结构
 
@@ -69,20 +72,25 @@ engine/
 │   └── route.ts              # 预算预占及资金账本查询
 ├── app/api/ops/
 │   ├── health/route.ts       # 健康汇总、完整性检查与过期预占释放
+│   ├── recall-suite/route.ts # 召回黄金场景服务端批量回放
 │   └── request/[id]/route.ts # 请求、拍卖、事件、预算和账本全链路
 ├── app/api/inventory/
 │   └── route.ts              # 库存查询、幂等修改与操作审计
 ├── app/api/{campaigns,placements,strategies,experiments}/
 │   └── route.ts              # 投放、广告位、策略和实验服务接口
 ├── app/server/
-│   └── budget.ts             # 预算原子预占、确认和超时释放
+│   ├── budget.ts             # 预算原子预占、确认、超时释放与分时 Pacing 上限
+│   └── inventory.ts          # 标准演示库存引导与 D1 库存加载
 ├── worker/
 │   └── index.ts              # Cloudflare Worker 运行入口
 ├── tests/
-│   └── rendered-html.test.mjs # 服务端渲染与核心能力检查
+│   ├── rendered-html.test.mjs   # 服务端渲染与核心能力检查
+│   ├── api-behavior.test.mjs    # 行为级集成测试（真实请求→事件→扣费→账本）
+│   └── helpers/                 # cloudflare:workers 测试 shim 与内存 D1 适配器
 ├── docs/
 │   ├── code-structure.md     # 本文档
-│   └── operator-guide.md     # 本地运营与验收手册
+│   ├── operator-guide.md     # 本地运营与验收手册
+│   └── production-gap-analysis.md # 商用化剩余差距与优先级
 ├── .openai/hosting.json      # Sites 项目及资源绑定配置
 ├── vite.config.ts            # vinext、Vite、Sites 构建配置
 ├── next.config.ts            # Next 兼容层配置
@@ -96,17 +104,15 @@ engine/
 page.tsx
 └── AdWorkbench
     ├── Header
-    ├── Lab                     请求实验室
-    │   ├── Profile             用户及请求画像
-    │   ├── AdTable             各阶段候选明细
-    │   └── Billing             胜出广告和计费结果
+    ├── DecisionLab             请求实验室（Profile / AdTable / Billing）
     ├── StrategyCenter          策略版本治理
-    ├── LiveMonitor             真实数据监控
-    ├── RecallTestBench         召回测试台
-    ├── InventoryManager        库存、计划与广告位管理
+    ├── InventoryManager        库存管理（含 CampaignPortfolio / PlacementManager）
     ├── EventConsole            真实事件闭环
     ├── RiskConsole             数据库风险扫描
-    └── ExperimentConsole       稳定分桶 A/B 实验
+    ├── ExperimentConsole       稳定分桶 A/B 实验
+    ├── RecallTestBench         召回测试台（服务端回放）
+    ├── OperationsCenter        运行健康与请求全链路
+    └── LiveMonitor             真实数据监控
 ```
 
 `AdWorkbench.tsx` 只负责全局请求状态和顶部导航。决策实验室及各商业化模块均已拆分为独立组件，避免主工作台继续膨胀。
@@ -194,11 +200,17 @@ oCPM eCPM = 目标转化出价 × pCTR × pCVR × 1000
 
 ### 召回测试台
 
-`RecallTestBench` 使用同一套 `runEngine` 依次执行 8 个固定黄金场景，覆盖城市、设备、广告位及零兴趣、单兴趣、多兴趣和全兴趣请求。每个场景记录召回、过滤、粗排、精排数量，以及定向、兴趣、热门三路通道命中、多通道交集和执行耗时。
+`RecallTestBench` 通过 `POST /api/ops/recall-suite` 在服务端依次回放 8 个固定黄金场景（也支持自定义场景），覆盖城市、设备、广告位及零兴趣、单兴趣、多兴趣和全兴趣请求。回放直接读取 D1 真实库存并使用当前生产策略版本，因此修改出价、暂停广告或激活新策略后重新回放会立即反映真实投放效果。
 
-当前自动断言包括：最少/最多召回量、合并结果不存在重复广告、最大执行耗时、粗排不超过 Top 30、精排不超过 Top 8。门槛可以在页面中调整并重新测试。
+每个场景记录召回、过滤、粗排、精排数量，以及定向、兴趣、热门三路通道命中、多通道交集和服务端执行耗时。
 
-测试人员可以选择城市、设备、场景和多个兴趣创建临时用例，也可以删除临时用例或只查看失败结果。失败行直接列出不满足的断言；“导出 JSON”会生成包含测试环境、质量门槛、汇总指标和逐用例明细的报告，便于留档和比较版本差异。
+当前自动断言包括：最少/最多召回量、合并结果不存在重复广告、最大执行耗时、粗排/精排截断边界。门槛可以在页面中调整并重新测试。
+
+测试人员可以选择城市、设备、场景和多个兴趣创建临时用例，也可以删除临时用例或只查看失败结果。失败行直接列出不满足的断言；“导出 JSON”会生成包含回放环境（库存规模、策略版本）、质量门槛、汇总指标和逐用例明细的报告，便于留档和比较版本差异。
+
+### 分时 Pacing
+
+Campaign 支持 `asap`（默认，仅受日预算上限约束）和 `even`（匀速）两种 Pacing 模式，可在投放页切换并写入操作审计。`even` 模式在预算预占阶段按上海投放日的已过分钟数线性放预算：当日已消耗超过 `日预算 × 已过时长/24h` 时拒绝新的预占，请求侧表现为 `budget_unavailable` 填充失败并自动尝试下一候选。
 
 ## 7. 样式组织
 
@@ -219,7 +231,7 @@ npm run build
 ```
 
 - `npm run dev`：启动本地开发服务。
-- `npm test`：先执行生产构建，再检查服务端渲染、五阶段引擎和商业化模块。
+- `npm test`：先执行生产构建，再执行两组测试。`rendered-html.test.mjs` 检查服务端渲染和核心能力声明；`api-behavior.test.mjs` 通过 Node module loader 把 `cloudflare:workers` 替换为测试 shim，注入基于 `node:sqlite` 的内存 D1（自动应用全部 drizzle 迁移，包括不可变触发器），然后对构建产物发起真实 HTTP 调用，覆盖决策、事件顺序、幂等扣费、账本对账、过期释放、频控、审计幂等、分时 Pacing 和召回回放等行为。
 - `npm run build`：生成 Cloudflare Worker 兼容的部署产物。
 
 ### 本地实时数据库
